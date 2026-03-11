@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+<title>6. Decision Trees</title>
+<link href="../Styles/epub.css" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+<div id="sbo-rt-content"><section data-pdf-bookmark="Chapter 6. Decision Trees" data-type="chapter" epub:type="chapter"><div class="chapter" id="trees_chapter">
+<h1><span class="label">Chapter 6. </span>Decision Trees</h1>
+<p><em>Decision trees</em> are versatile machine learning algorithms that can perform both classification and regression tasks, and even multioutput tasks. They are powerful algorithms, capable of fitting complex datasets. For example, in <a data-type="xref" href="HOMLWSKT006.xhtml#project_chapter">Chapter 2</a> you trained a <code>DecisionTreeRegressor</code> model on the California housing dataset, fitting it perfectly (actually, overfitting it).<a data-primary="decision trees" data-type="indexterm" id="ix_decision_trees_ch6"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.tree.DecisionTreeRegressor" data-type="indexterm" id="idm45983118498976"></a><a data-primary="DecisionTreeRegressor" data-type="indexterm" id="idm45983118498064"></a></p>
+<p>Decision trees are also the fundamental components of random forests (see <a data-type="xref" href="HOMLWSKT011.xhtml#ensembles_chapter">Chapter 7</a>), which are among the most powerful machine learning algorithms available today.</p>
+<p>In this chapter we will start by discussing how to train, visualize, and make predictions with decision trees. Then we will go through the CART training algorithm used by Scikit-Learn, and we will explore how to regularize trees and use them for regression tasks. Finally, we will discuss some of the limitations of decision trees.</p>
+<section data-pdf-bookmark="Training and Visualizing a Decision Tree" data-type="sect1"><div class="sect1" id="idm45983118495632">
+<h2 id="sigil_toc_id_114">Training and Visualizing a Decision Tree</h2>
+<p>To understand decision trees, let’s build one and take a look at how it makes predictions. <a data-primary="visualization of data" data-secondary="decision trees" data-type="indexterm" id="ix_vis_decision_tree"></a><a data-primary="decision trees" data-secondary="training and visualizing" data-type="indexterm" id="ix_decision_tree_train_vis"></a>The following code trains a <code>DecisionTreeClassifier</code> on the iris dataset (see <a data-type="xref" href="HOMLWSKT008.xhtml#linear_models_chapter">Chapter 4</a>):<a data-primary="DecisionTreeClassifier" data-type="indexterm" id="idm45983118490080"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.tree.DecisionTreeClassifier" data-type="indexterm" id="idm45983118489376"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.datasets</code> <code class="kn">import</code> <code class="n">load_iris</code>
+<code class="kn">from</code> <code class="nn">sklearn.tree</code> <code class="kn">import</code> <code class="n">DecisionTreeClassifier</code>
+
+<code class="n">iris</code> <code class="o">=</code> <code class="n">load_iris</code><code class="p">(</code><code class="n">as_frame</code><code class="o">=</code><code class="kc">True</code><code class="p">)</code>
+<code class="n">X_iris</code> <code class="o">=</code> <code class="n">iris</code><code class="o">.</code><code class="n">data</code><code class="p">[[</code><code class="s2">"petal length (cm)"</code><code class="p">,</code> <code class="s2">"petal width (cm)"</code><code class="p">]]</code><code class="o">.</code><code class="n">values</code>
+<code class="n">y_iris</code> <code class="o">=</code> <code class="n">iris</code><code class="o">.</code><code class="n">target</code>
+
+<code class="n">tree_clf</code> <code class="o">=</code> <code class="n">DecisionTreeClassifier</code><code class="p">(</code><code class="n">max_depth</code><code class="o">=</code><code class="mi">2</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">tree_clf</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_iris</code><code class="p">,</code> <code class="n">y_iris</code><code class="p">)</code></pre>
+<p>You can visualize the trained decision tree by first using the <code>export_graphviz()</code> function to output a graph definition file called <em>iris_tree.dot</em>:<a data-primary="export_graphviz()" data-type="indexterm" id="idm45983118461520"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.tree.export_graphviz()" data-type="indexterm" id="idm45983118460880"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.tree</code> <code class="kn">import</code> <code class="n">export_graphviz</code>
+
+<code class="n">export_graphviz</code><code class="p">(</code>
+        <code class="n">tree_clf</code><code class="p">,</code>
+        <code class="n">out_file</code><code class="o">=</code><code class="s2">"iris_tree.dot"</code><code class="p">,</code>
+        <code class="n">feature_names</code><code class="o">=</code><code class="p">[</code><code class="s2">"petal length (cm)"</code><code class="p">,</code> <code class="s2">"petal width (cm)"</code><code class="p">],</code>
+        <code class="n">class_names</code><code class="o">=</code><code class="n">iris</code><code class="o">.</code><code class="n">target_names</code><code class="p">,</code>
+        <code class="n">rounded</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code>
+        <code class="n">filled</code><code class="o">=</code><code class="kc">True</code>
+    <code class="p">)</code></pre>
+<p>Then you can use <code>graphviz.Source.from_file()</code> to load and display the file in a Jupyter notebook:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">graphviz</code> <code class="kn">import</code> <code class="n">Source</code>
+
+<code class="n">Source</code><code class="o">.</code><code class="n">from_file</code><code class="p">(</code><code class="s2">"iris_tree.dot"</code><code class="p">)</code></pre>
+<p><a href="https://graphviz.org">Graphviz</a> is an open source graph visualization software package. It also includes a <code>dot</code> command-line tool to convert <em>.dot</em> files to a variety of formats, such as PDF or PNG.<a data-primary="Graphviz" data-type="indexterm" id="idm45983118317760"></a></p>
+<p>Your first decision tree looks like <a data-type="xref" href="#iris_tree">Figure 6-1</a>.<a data-primary="" data-startref="ix_decision_tree_train_vis" data-type="indexterm" id="idm45983118315872"></a><a data-primary="" data-startref="ix_vis_decision_tree" data-type="indexterm" id="idm45983118314928"></a></p>
+<figure class="width-90"><div class="figure" id="iris_tree">
+<img alt="mls3 0601" height="430" src="../Images/mls3_0601.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 6-1. </span>Iris decision tree</h6>
+</div>
+</figure>
+</div>
+</section>
+<section data-pdf-bookmark="Making Predictions" data-type="sect1"><div class="sect1" id="idm45983118495008">
+<h2 id="sigil_toc_id_115">Making Predictions</h2>
+<p>Let’s see how the tree represented in <a data-type="xref" href="#iris_tree">Figure 6-1</a> makes predictions. Suppose you find an iris flower and you want to classify it based on its petals. <a data-primary="predictions" data-secondary="decision trees" data-type="indexterm" id="ix_predict_decision_tree"></a><a data-primary="decision trees" data-secondary="predictions" data-type="indexterm" id="ix_decision_trees_predict"></a>You start at the <em>root node</em> (depth 0, at the top): this node asks whether the flower’s petal length is smaller than 2.45 cm. If it is, then you move down to the root’s left child node (depth 1, left). <a data-primary="leaf node, decision tree" data-type="indexterm" id="idm45983118285440"></a><a data-primary="root node, decision tree" data-type="indexterm" id="idm45983118284768"></a>In this case, it is a <em>leaf node</em> (i.e., it does not have any child nodes), so it does not ask any questions: simply look at the predicted class for that node, and the decision tree predicts that your flower is an <em>Iris setosa</em> (<code>class=setosa</code>).</p>
+<p>Now suppose you find another flower, and this time the petal length is greater than 2.45 cm. You again start at the root but now move down to its right child node (depth 1, right). <a data-primary="split node, decision tree" data-type="indexterm" id="idm45983118282048"></a>This is not a leaf node, it’s a <em>split node</em>, so it asks another question: is the petal width smaller than 1.75 cm? If it is, then your flower is most likely an <em>Iris versicolor</em> (depth 2, left). If not, it is likely an <em>Iris virginica</em> (depth 2, right). It’s really that simple.</p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>One of the many qualities of decision trees is that they require very little data preparation. In fact, they don’t require feature scaling or centering at all.</p>
+</div>
+<p>A node’s <code>samples</code> attribute counts how many training instances it applies to. For example, 100 training instances have a petal length greater than 2.45 cm (depth 1, right), and of those 100, 54 have a petal width smaller than 1.75 cm (depth 2, left). A node’s <code>value</code> attribute tells you how many training instances of each class this node applies to: for example, the bottom-right node applies to 0 <em>Iris setosa</em>, 1 <em>Iris versicolor</em>, and 45 <em>Iris virginica</em>. <a data-primary="GINI impurity" data-type="indexterm" id="idm45983118275632"></a><a data-primary="impurity measures" data-type="indexterm" id="idm45983118274896"></a>Finally, a node’s <code>gini</code> attribute measures its <em>Gini impurity</em>: a node is “pure” (<code>gini=0</code>) if all training instances it applies to belong to the same class. For example, since the depth-1 left node applies only to <em>Iris setosa</em> training instances, it is pure and its Gini impurity is 0. <a data-type="xref" href="#gini_impurity">Equation 6-1</a> shows how the training algorithm computes the Gini impurity <em>G</em><sub><em>i</em></sub> of the <em>i</em><sup>th</sup> node. The depth-2 left node has a Gini impurity equal to 1 – (0/54)<sup>2</sup> – (49/54)<sup>2</sup> – (5/54)<sup>2</sup> ≈ 0.168.</p>
+<div data-type="equation" id="gini_impurity">
+<h5 class="sigil_not_in_toc"><span class="label">Equation 6-1. </span>Gini impurity</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mrow>
+<msub><mi>G</mi> <mi>i</mi> </msub>
+<mo>=</mo>
+<mn>1</mn>
+<mo>-</mo>
+<munderover><mo>∑</mo> <mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow> <mi>n</mi> </munderover>
+<msup><mrow><msub><mi>p</mi> <mrow><mi>i</mi><mo>,</mo><mi>k</mi></mrow> </msub></mrow> <mn>2</mn> </msup>
+</mrow>
+</math>
+</div>
+<p class="pagebreak-before">In this equation:</p>
+<ul>
+<li>
+<p><em>G</em><sub><em>i</em></sub> is the Gini impurity of the <em>i</em><sup>th</sup> node.</p>
+</li>
+<li>
+<p><em>p</em><sub><em>i</em>,<em>k</em></sub> is the ratio of class <em>k</em> instances among the training instances in the <em>i</em><sup>th</sup> node.</p>
+</li>
+</ul>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p><a data-primary="binary trees" data-type="indexterm" id="idm45983118250784"></a><a data-primary="CART (Classification and Regression Tree) algorithm" data-type="indexterm" id="idm45983118250080"></a><a data-primary="Classification and Regression Tree (CART) algorithm" data-type="indexterm" id="idm45983118249312"></a>Scikit-Learn uses the CART algorithm, which produces only <em>binary trees</em>, meaning trees where split nodes always have exactly two children (i.e., questions only have yes/no answers). However, other algorithms, such as ID3, can produce decision trees with nodes that have more than two <span class="keep-together">children</span>.</p>
+</div>
+<p><a data-type="xref" href="#decision_tree_decision_boundaries_plot">Figure 6-2</a> shows this decision tree’s decision boundaries. <a data-primary="decision boundaries" data-type="indexterm" id="idm45983118245936"></a><a data-primary="decision trees" data-secondary="and decision boundaries" data-secondary-sortas="decision boundaries" data-type="indexterm" id="idm45983118245264"></a><a data-primary="root node, decision tree" data-type="indexterm" id="idm45983118244048"></a>The thick vertical line represents the decision boundary of the root node (depth 0): petal length = 2.45 cm. Since the lefthand area is pure (only <em>Iris setosa</em>), it cannot be split any further. However, the righthand area is impure, so the depth-1 right node splits it at petal width = 1.75 cm (represented by the dashed line). Since <code>max_depth</code> was set to 2, the decision tree stops right there. If you set <code>max_depth</code> to 3, then the two depth-2 nodes would each add another decision boundary (represented by the two vertical dotted lines).</p>
+<figure class="smallerninety"><div class="figure" id="decision_tree_decision_boundaries_plot">
+<img alt="mls3 0602" height="287" src="../Images/mls3_0602.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 6-2. </span>Decision tree decision boundaries</h6>
+</div>
+</figure>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>The tree structure, including all the information shown in <a data-type="xref" href="#iris_tree">Figure 6-1</a>, is available via the classifier’s <code>tree_</code> attribute. Type <strong><code>help(tree_clf.tree_)</code></strong> for details, and see the <a href="https://homl.info/colab3">this chapter’s notebook</a> for an example.</p>
+</div>
+<aside data-type="sidebar" epub:type="sidebar"><div class="sidebar" id="idm45983118236208">
+<h5 class="sigil_not_in_toc">Model Interpretation: White Box Versus Black Box</h5>
+<p>Decision trees are intuitive, and their decisions are easy to interpret. Such models are often called <em>white box models</em>. <a data-primary="black box models" data-type="indexterm" id="idm45983118234096"></a><a data-primary="white box models" data-type="indexterm" id="idm45983118233360"></a>In contrast, as you will see, random forests and neural networks are generally considered <em>black box models</em>. They make great predictions, and you can easily check the calculations that they performed to make these predictions; nevertheless, it is usually hard to explain in simple terms why the predictions were made. For example, if a neural network says that a particular person appears in a picture, it is hard to know what contributed to this prediction: Did the model recognize that person’s eyes? Their mouth? Their nose? Their shoes? Or even the couch that they were sitting on? Conversely, decision trees provide nice, simple classification rules that can even be applied manually if need be (e.g., for flower classification). <a data-primary="interpretable ML" data-type="indexterm" id="idm45983118232064"></a>The field of <em>interpretable ML</em> aims at creating ML systems that can explain their decisions in a way humans can understand. This is important in many domains—for example, to ensure the system does not make unfair decisions.</p>
+</div>
+</aside>
+</div>
+</section>
+<section data-pdf-bookmark="Estimating Class Probabilities" data-type="sect1"><div class="sect1" id="idm45983118290496">
+<h2 id="sigil_toc_id_116">Estimating Class Probabilities</h2>
+<p>A decision tree can also estimate the probability that an instance belongs to a particular class <em>k</em>. <a data-primary="decision trees" data-secondary="class probability estimates" data-type="indexterm" id="idm45983118228768"></a><a data-primary="probabilities, estimating" data-type="indexterm" id="idm45983118227792"></a><a data-primary="leaf node, decision tree" data-type="indexterm" id="idm45983118227152"></a>First it traverses the tree to find the leaf node for this instance, and then it returns the ratio of training instances of class <em>k</em> in this node. For example, suppose you have found a flower whose petals are 5 cm long and 1.5 cm wide. The <span class="keep-together">corresponding</span> leaf node is the depth-2 left node, so the decision tree outputs the following probabilities: 0% for <em>Iris setosa</em> (0/54), 90.7% for <em>Iris versicolor</em> (49/54), and 9.3% for <em>Iris virginica</em> (5/54). And if you ask it to predict the class, it outputs <em>Iris versicolor</em> (class 1) because it has the highest probability. Let’s check this:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">tree_clf</code><code class="o">.</code><code class="n">predict_proba</code><code class="p">([[</code><code class="mi">5</code><code class="p">,</code> <code class="mf">1.5</code><code class="p">]])</code><code class="o">.</code><code class="n">round</code><code class="p">(</code><code class="mi">3</code><code class="p">)</code>
+<code class="go">array([[0.   , 0.907, 0.093]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">tree_clf</code><code class="o">.</code><code class="n">predict</code><code class="p">([[</code><code class="mi">5</code><code class="p">,</code> <code class="mf">1.5</code><code class="p">]])</code>
+<code class="go">array([1])</code></pre>
+<p>Perfect! Notice that the estimated probabilities would be identical anywhere else in the bottom-right rectangle of <a data-type="xref" href="#decision_tree_decision_boundaries_plot">Figure 6-2</a>—for example, if the petals were 6 cm long and 1.5 cm wide (even though it seems obvious that it would most likely be an <em>Iris virginica</em> in this case).</p>
+</div>
+</section>
+<section data-pdf-bookmark="The CART Training Algorithm" data-type="sect1"><div class="sect1" id="idm45983118163968">
+<h2 id="sigil_toc_id_117">The CART Training Algorithm</h2>
+<p>Scikit-Learn uses the <em>Classification and Regression Tree</em> (CART) algorithm to train decision trees (also called “growing” trees). <a data-primary="Scikit-Learn" data-secondary="CART algorithm" data-type="indexterm" id="idm45983118203248"></a>The algorithm works by first splitting the training set into two subsets using a single feature <em>k</em> and a threshold <em>t</em><sub><em>k</em></sub> (e.g., “petal length ≤ 2.45 cm”). How does it choose <em>k</em> and <em>t</em><sub><em>k</em></sub>? It searches for the pair (<em>k</em>, <em>t</em><sub><em>k</em></sub>) that produces the purest subsets, weighted by their size. <a data-type="xref" href="#classification_cart_cost_function">Equation 6-2</a> gives the cost function that the algorithm tries to minimize.<a data-primary="CART (Classification and Regression Tree) algorithm" data-type="indexterm" id="idm45983118197456"></a><a data-primary="Classification and Regression Tree (CART) algorithm" data-type="indexterm" id="idm45983118196816"></a><a data-primary="cost function" data-secondary="in CART training algorithm" data-secondary-sortas="CART training algorithm" data-type="indexterm" id="idm45983118196176"></a><a data-primary="decision trees" data-secondary="CART training algorithm" data-type="indexterm" id="idm45983118156800"></a></p>
+<div data-type="equation" id="classification_cart_cost_function">
+<h5 class="sigil_not_in_toc"><span class="label">Equation 6-2. </span>CART cost function for classification</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mi>J</mi>
+<mrow>
+<mo>(</mo>
+<mi>k</mi>
+<mo>,</mo>
+<msub><mi>t</mi> <mi>k</mi> </msub>
+<mo>)</mo>
+</mrow>
+<mo>=</mo>
+<mstyle displaystyle="true" scriptlevel="0">
+<mfrac><msub><mi>m</mi> <mtext>left</mtext> </msub> <mi>m</mi></mfrac>
+</mstyle>
+<msub><mi>G</mi> <mtext>left</mtext> </msub>
+<mo>+</mo>
+<mstyle displaystyle="true" scriptlevel="0">
+<mfrac><msub><mi>m</mi> <mtext>right</mtext> </msub> <mi>m</mi></mfrac>
+</mstyle>
+<msub><mi>G</mi> <mtext>right</mtext> </msub>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mtext>where</mtext>
+<mspace width="4.pt"/>
+<mfenced close="" open="{" separators="">
+<mtable>
+<mtr>
+<mtd columnalign="left">
+<mrow>
+<msub><mi>G</mi> <mtext>left/right</mtext> </msub>
+<mspace width="4.pt"/>
+<mtext>measures</mtext>
+<mspace width="4.pt"/>
+<mtext>the</mtext>
+<mspace width="4.pt"/>
+<mtext>impurity</mtext>
+<mspace width="4.pt"/>
+<mtext>of</mtext>
+<mspace width="4.pt"/>
+<mtext>the</mtext>
+<mspace width="4.pt"/>
+<mtext>left/right</mtext>
+<mspace width="4.pt"/>
+<mtext>subset</mtext>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="left">
+<mrow>
+<msub><mi>m</mi> <mtext>left/right</mtext> </msub>
+<mspace width="4.pt"/>
+<mtext>is</mtext>
+<mspace width="4.pt"/>
+<mtext>the</mtext>
+<mspace width="4.pt"/>
+<mtext>number</mtext>
+<mspace width="4.pt"/>
+<mtext>of</mtext>
+<mspace width="4.pt"/>
+<mtext>instances</mtext>
+<mspace width="4.pt"/>
+<mtext>in</mtext>
+<mspace width="4.pt"/>
+<mtext>the</mtext>
+<mspace width="4.pt"/>
+<mtext>left/right</mtext>
+<mspace width="4.pt"/>
+<mtext>subset</mtext>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</mfenced>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>Once the CART algorithm has successfully split the training set in two, it splits the subsets using the same logic, then the sub-subsets, and so on, recursively. It stops recursing once it reaches the maximum depth (defined by the <code>max_depth</code> hyperparameter), or if it cannot find a split that will reduce impurity. <a data-primary="hyperparameters" data-secondary="CART algorithm" data-type="indexterm" id="idm45983118110832"></a>A few other hyperparameters (described in a moment) control additional stopping conditions: <code>min_samples_split</code>, <code>min_samples_leaf</code>, <code>min_weight_fraction_leaf</code>, and <code>max_leaf_nodes</code>.</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>As you can see, the CART algorithm is a <em>greedy algorithm</em>: it greedily searches for an optimum split at the top level, then repeats the process at each subsequent level. <a data-primary="greedy algorithm, CART as" data-type="indexterm" id="idm45983118106464"></a>It does not check whether or not the split will lead to the lowest possible impurity several levels down. A greedy algorithm often produces a solution that’s reasonably good but not guaranteed to be optimal.</p>
+<p>Unfortunately, finding the optimal tree is known to be an <em>NP-complete</em> problem.⁠<sup><a data-type="noteref" href="#idm45983118104640" id="idm45983118104640-marker">1</a></sup> It requires <em>O</em>(exp(<em>m</em>)) time, making the problem intractable even for small training sets. This is why we must settle for a “reasonably good” solution when training decision trees.<a data-primary="" data-startref="ix_decision_trees_predict" data-type="indexterm" id="idm45983118101424"></a><a data-primary="" data-startref="ix_predict_decision_tree" data-type="indexterm" id="idm45983118100576"></a></p>
+</div>
+</div>
+</section>
+<section data-pdf-bookmark="Computational Complexity" data-type="sect1"><div class="sect1" id="idm45983118099472">
+<h2 id="sigil_toc_id_118">Computational Complexity</h2>
+<p>Making predictions requires traversing the decision tree from the root to a leaf. <a data-primary="decision trees" data-secondary="computational complexity" data-type="indexterm" id="idm45983118098336"></a><a data-primary="computational complexity" data-secondary="decision trees" data-type="indexterm" id="idm45983118097072"></a><a data-primary="binary logarithm" data-type="indexterm" id="idm45983118096224"></a>Decision trees generally are approximately balanced, so traversing the decision tree requires going through roughly <em>O</em>(log<sub>2</sub>(<em>m</em>)) nodes, where log<sub>2</sub>(<em>m</em>) is the <em>binary logarithm</em> of <em>m</em>, equal to log(<em>m</em>) / log(2). Since each node only requires checking the value of one feature, the overall prediction complexity is <em>O</em>(log<sub>2</sub>(<em>m</em>)), independent of the number of features. So predictions are very fast, even when dealing with large training sets.</p>
+<p>The training algorithm compares all features (or less if <code>max_features</code> is set) on all samples at each node. Comparing all features on all samples at each node results in a training complexity of <em>O</em>(<em>n</em> × <em>m</em> log<sub>2</sub>(<em>m</em>)).</p>
+</div>
+</section>
+<section data-pdf-bookmark="Gini Impurity or Entropy?" data-type="sect1"><div class="sect1" id="idm45983118087488">
+<h2 id="sigil_toc_id_119">Gini Impurity or Entropy?</h2>
+<p>By default, the <code>DecisionTreeClassifier</code> class uses the Gini impurity measure, but you can select the <em>entropy</em> impurity measure instead by setting the <code>criterion</code> hyperparameter to <code>"entropy"</code>. <a data-primary="decision trees" data-secondary="GINI impurity or entropy measures" data-type="indexterm" id="idm45983118083936"></a><a data-primary="entropy impurity measure" data-type="indexterm" id="idm45983118082960"></a><a data-primary="GINI impurity" data-type="indexterm" id="idm45983118082320"></a><a data-primary="impurity measures" data-type="indexterm" id="idm45983118081648"></a><a data-primary="DecisionTreeClassifier" data-type="indexterm" id="idm45983118080976"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.tree.DecisionTreeClassifier" data-type="indexterm" id="idm45983118080304"></a><a data-primary="information theory" data-type="indexterm" id="idm45983118079344"></a>The concept of entropy originated in thermodynamics as a measure of molecular disorder: entropy approaches zero when molecules are still and well ordered. Entropy later spread to a wide variety of domains, including in Shannon’s information theory, where it measures the average information content of a message, as we saw in <a data-type="xref" href="HOMLWSKT008.xhtml#linear_models_chapter">Chapter 4</a>. Entropy is zero when all messages are identical. In machine learning, entropy is frequently used as an <span class="keep-together">impurity</span> measure: a set’s entropy is zero when it contains instances of only one class. <a data-type="xref" href="#entropy_function">Equation 6-3</a> shows the definition of the entropy of the <em>i</em><sup>th</sup> node. For example, the depth-2 left node in <a data-type="xref" href="#iris_tree">Figure 6-1</a> has an entropy equal to –(49/54) log<sub>2</sub> (49/54) – (5/54) log<sub>2</sub> (5/54) ≈ 0.445.</p>
+<div data-type="equation" id="entropy_function">
+<h5 class="sigil_not_in_toc"><span class="label">Equation 6-3. </span>Entropy</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mrow>
+<msub><mi>H</mi> <mi>i</mi> </msub>
+<mo>=</mo>
+<mo>-</mo>
+<munderover><mo>∑</mo> <mfrac linethickness="0pt"><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow> <mrow><msub><mi>p</mi> <mrow><mi>i</mi><mo>,</mo><mi>k</mi></mrow> </msub><mo>≠</mo><mn>0</mn></mrow></mfrac> <mi>n</mi> </munderover>
+<mrow>
+<msub><mi>p</mi> <mrow><mi>i</mi><mo>,</mo><mi>k</mi></mrow> </msub>
+<msub><mo form="prefix">log</mo> <mn>2</mn> </msub>
+<mrow>
+<mo>(</mo>
+<msub><mi>p</mi> <mrow><mi>i</mi><mo>,</mo><mi>k</mi></mrow> </msub>
+<mo>)</mo>
+</mrow>
+</mrow>
+</mrow>
+</math>
+</div>
+<p>So, should you use Gini impurity or entropy? The truth is, most of the time it does not make a big difference: they lead to similar trees. Gini impurity is slightly faster to compute, so it is a good default. However, when they differ, Gini impurity tends to isolate the most frequent class in its own branch of the tree, while entropy tends to produce slightly more balanced trees.⁠<sup><a data-type="noteref" href="#idm45983118055568" id="idm45983118055568-marker">2</a></sup></p>
+</div>
+</section>
+<section data-pdf-bookmark="Regularization Hyperparameters" data-type="sect1"><div class="sect1" id="idm45983118054032">
+<h2 id="sigil_toc_id_120">Regularization Hyperparameters</h2>
+<p>Decision trees make very few assumptions about the training data (as opposed to linear models, which assume that the data is linear, for example). <a data-primary="regularization" data-secondary="hyperparameters" data-type="indexterm" id="ix_regul_hyperparam"></a><a data-primary="decision trees" data-secondary="regularization hyperparameters" data-type="indexterm" id="ix_decision_trees_regul_hyper"></a>If left unconstrained, the tree structure will adapt itself to the training data, fitting it very closely—indeed, most likely overfitting it. <a data-primary="overfitting of data" data-secondary="and decision trees" data-secondary-sortas="decision trees" data-type="indexterm" id="idm45983118049248"></a><a data-primary="nonparametric models" data-type="indexterm" id="idm45983118048032"></a>Such a model is often called a <em>nonparametric model</em>, not because it does not have any parameters (it often has a lot) but because the number of parameters is not determined prior to training, so the model structure is free to stick closely to the data. <a data-primary="parametric models" data-type="indexterm" id="idm45983118046848"></a>In contrast, a <em>parametric model</em>, such as a linear model, has a predetermined number of parameters, so its degree of freedom is limited, reducing the risk of overfitting (but increasing the risk of underfitting).</p>
+<p>To avoid overfitting the training data, you need to restrict the decision tree’s freedom during training. As you know by now, this is called regularization. The regularization hyperparameters depend on the algorithm used, but generally you can at least restrict the maximum depth of the decision tree. In Scikit-Learn, this is controlled by the <code>max_depth</code> hyperparameter. The default value is <code>None</code>, which means unlimited. Reducing <code>max_depth</code> will regularize the model and thus reduce the risk of overfitting.</p>
+<p>The <code>DecisionTreeClassifier</code> class has a few other parameters that similarly restrict the shape of the decision tree:<a data-primary="DecisionTreeClassifier" data-type="indexterm" id="idm45983118042768"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.tree.DecisionTreeClassifier" data-type="indexterm" id="idm45983118042064"></a></p>
+<dl>
+<dt><code>max_features</code></dt>
+<dd>
+<p>Maximum number of features that are evaluated for splitting at each node</p>
+</dd>
+<dt><code>max_leaf_nodes</code></dt>
+<dd>
+<p>Maximum number of leaf nodes</p>
+</dd>
+<dt><code>min_samples_split</code></dt>
+<dd>
+<p>Minimum number of samples a node must have before it can be split</p>
+</dd>
+<dt><code>min_samples_leaf</code></dt>
+<dd>
+<p>Minimum number of samples a leaf node must have to be created</p>
+</dd>
+<dt><code>min_weight_fraction_leaf</code></dt>
+<dd>
+<p>Same as <code>min_samples_leaf</code> but expressed as a fraction of the total number of weighted instances</p>
+</dd>
+</dl>
+<p>Increasing <code>min_*</code> hyperparameters or reducing <code>max_*</code> hyperparameters will regularize the model.</p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p><a data-primary="pruning of decision tree nodes" data-type="indexterm" id="idm45983118030464"></a>Other algorithms work by first training the decision tree without restrictions, then <em>pruning</em> (deleting) unnecessary nodes. <a data-primary="leaf node, decision tree" data-type="indexterm" id="idm45983118028816"></a><a data-primary="statistical significance" data-type="indexterm" id="idm45983118028080"></a>A node whose children are all leaf nodes is considered unnecessary if the purity improvement it provides is not statistically significant. <a data-primary="null hypothesis" data-type="indexterm" id="idm45983118027104"></a><a data-primary="p-value" data-type="indexterm" id="idm45983118026432"></a><a data-primary="χ² test" data-type="indexterm" id="idm45983118025760"></a><a data-primary="chi-squared (χ²) test" data-type="indexterm" id="idm45983118025088"></a>Standard statistical tests, such as the <em>χ</em><sup>2</sup> <em>test</em> (chi-squared test), are used to estimate the probability that the improvement is purely the result of chance (which is called the <em>null hypothesis</em>). If this probability, called the <em>p-value</em>, is higher than a given threshold (typically 5%, controlled by a hyperparameter), then the node is considered unnecessary and its children are deleted. The pruning continues until all unnecessary nodes have been pruned.</p>
+</div>
+<p>Let’s test regularization on the moons dataset, introduced in <a data-type="xref" href="HOMLWSKT009.xhtml#svm_chapter">Chapter 5</a>. <a data-primary="regularization" data-secondary="decision trees" data-type="indexterm" id="idm45983118021104"></a>We’ll train one decision tree without regularization, and another with <code>min_samples_leaf=5</code>. Here’s the code; <a data-type="xref" href="#min_samples_leaf_plot">Figure 6-3</a> shows the decision boundaries of each tree:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.datasets</code> <code class="kn">import</code> <code class="n">make_moons</code>
+
+<code class="n">X_moons</code><code class="p">,</code> <code class="n">y_moons</code> <code class="o">=</code> <code class="n">make_moons</code><code class="p">(</code><code class="n">n_samples</code><code class="o">=</code><code class="mi">150</code><code class="p">,</code> <code class="n">noise</code><code class="o">=</code><code class="mf">0.2</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+
+<code class="n">tree_clf1</code> <code class="o">=</code> <code class="n">DecisionTreeClassifier</code><code class="p">(</code><code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">tree_clf2</code> <code class="o">=</code> <code class="n">DecisionTreeClassifier</code><code class="p">(</code><code class="n">min_samples_leaf</code><code class="o">=</code><code class="mi">5</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">tree_clf1</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_moons</code><code class="p">,</code> <code class="n">y_moons</code><code class="p">)</code>
+<code class="n">tree_clf2</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_moons</code><code class="p">,</code> <code class="n">y_moons</code><code class="p">)</code></pre>
+<figure><div class="figure" id="min_samples_leaf_plot">
+<img alt="mls3 0603" height="222" src="../Images/mls3_0603.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 6-3. </span>Decision boundaries of an unregularized tree (left) and a regularized tree (right)</h6>
+</div>
+</figure>
+<p>The unregularized model on the left is clearly overfitting, and the regularized model on the right will probably generalize better. We can verify this by evaluating both trees on a test set generated using a different random seed:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">X_moons_test</code><code class="p">,</code> <code class="n">y_moons_test</code> <code class="o">=</code> <code class="n">make_moons</code><code class="p">(</code><code class="n">n_samples</code><code class="o">=</code><code class="mi">1000</code><code class="p">,</code> <code class="n">noise</code><code class="o">=</code><code class="mf">0.2</code><code class="p">,</code>
+<code class="gp">... </code>                                        <code class="n">random_state</code><code class="o">=</code><code class="mi">43</code><code class="p">)</code>
+<code class="gp">...</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">tree_clf1</code><code class="o">.</code><code class="n">score</code><code class="p">(</code><code class="n">X_moons_test</code><code class="p">,</code> <code class="n">y_moons_test</code><code class="p">)</code>
+<code class="go">0.898</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">tree_clf2</code><code class="o">.</code><code class="n">score</code><code class="p">(</code><code class="n">X_moons_test</code><code class="p">,</code> <code class="n">y_moons_test</code><code class="p">)</code>
+<code class="go">0.92</code></pre>
+<p>Indeed, the second tree has a better accuracy on the test set.<a data-primary="" data-startref="ix_decision_trees_regul_hyper" data-type="indexterm" id="idm45983117880720"></a><a data-primary="" data-startref="ix_regul_hyperparam" data-type="indexterm" id="idm45983117851344"></a></p>
+</div>
+</section>
+<section class="less_space pagebreak-before" data-pdf-bookmark="Regression" data-type="sect1"><div class="sect1" id="idm45983118053376">
+<h2 id="sigil_toc_id_121">Regression</h2>
+<p>Decision trees are also capable of performing regression tasks. <a data-primary="regression models" data-secondary="decision tree tasks" data-type="indexterm" id="ix_regress_decision_tree"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.tree.DecisionTreeRegressor" data-type="indexterm" id="idm45983117847600"></a><a data-primary="decision trees" data-secondary="regression tasks" data-type="indexterm" id="ix_decision_trees_regress"></a><a data-primary="DecisionTreeRegressor" data-type="indexterm" id="idm45983117845536"></a>Let’s build a regression tree using Scikit-Learn’s <code>DecisionTreeRegressor</code> class, training it on a noisy quadratic dataset with <code>max_depth=2</code>:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">import</code> <code class="nn">numpy</code> <code class="k">as</code> <code class="nn">np</code>
+<code class="kn">from</code> <code class="nn">sklearn.tree</code> <code class="kn">import</code> <code class="n">DecisionTreeRegressor</code>
+
+<code class="n">np</code><code class="o">.</code><code class="n">random</code><code class="o">.</code><code class="n">seed</code><code class="p">(</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">X_quad</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">random</code><code class="o">.</code><code class="n">rand</code><code class="p">(</code><code class="mi">200</code><code class="p">,</code> <code class="mi">1</code><code class="p">)</code> <code class="o">-</code> <code class="mf">0.5</code>  <code class="c1"># a single random input feature</code>
+<code class="n">y_quad</code> <code class="o">=</code> <code class="n">X_quad</code> <code class="o">**</code> <code class="mi">2</code> <code class="o">+</code> <code class="mf">0.025</code> <code class="o">*</code> <code class="n">np</code><code class="o">.</code><code class="n">random</code><code class="o">.</code><code class="n">randn</code><code class="p">(</code><code class="mi">200</code><code class="p">,</code> <code class="mi">1</code><code class="p">)</code>
+
+<code class="n">tree_reg</code> <code class="o">=</code> <code class="n">DecisionTreeRegressor</code><code class="p">(</code><code class="n">max_depth</code><code class="o">=</code><code class="mi">2</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">tree_reg</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_quad</code><code class="p">,</code> <code class="n">y_quad</code><code class="p">)</code></pre>
+<p>The resulting tree is represented in <a data-type="xref" href="#regression_tree">Figure 6-4</a>.</p>
+<figure><div class="figure" id="regression_tree">
+<img alt="mls3 0604" height="336" src="../Images/mls3_0604.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 6-4. </span>A decision tree for regression</h6>
+</div>
+</figure>
+<p>This tree looks very similar to the classification tree you built earlier. The main difference is that instead of predicting a class in each node, it predicts a value. For example, suppose you want to make a prediction for a new instance with <em>x</em><sub>1</sub> = 0.2. The root node asks whether <em>x</em><sub>1</sub> ≤ 0.197. Since it is not, the algorithm goes to the right child node, which asks whether <em>x</em><sub>1</sub> ≤ 0.772. Since it is, the algorithm goes to the left child node. This is a leaf node, and it predicts <code>value=0.111</code>. This prediction is the average target value of the 110 training instances associated with this leaf node, and it results in a mean squared error equal to 0.015 over these 110 instances.</p>
+<p class="pagebreak-before">This model’s predictions are represented on the left in <a data-type="xref" href="#tree_regression_plot">Figure 6-5</a>. If you set <code>max_depth=3</code>, you get the predictions represented on the right. Notice how the predicted value for each region is always the average target value of the instances in that region. The algorithm splits each region in a way that makes most training instances as close as possible to that predicted value.</p>
+<figure><div class="figure" id="tree_regression_plot">
+<img alt="mls3 0605" height="227" src="../Images/mls3_0605.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 6-5. </span>Predictions of two decision tree regression models</h6>
+</div>
+</figure>
+<p>The CART algorithm<a data-primary="CART (Classification and Regression Tree) algorithm" data-type="indexterm" id="idm45983117724512"></a><a data-primary="Classification and Regression Tree (CART) algorithm" data-type="indexterm" id="idm45983117723904"></a> <a data-primary="cost function" data-secondary="in CART training algorithm" data-secondary-sortas="CART training algorithm" data-type="indexterm" id="idm45983117723168"></a><a data-primary="Scikit-Learn" data-secondary="CART algorithm" data-type="indexterm" id="idm45983117722080"></a>works as described earlier, except that instead of trying to split the training set in a way that minimizes impurity, it now tries to split the training set in a way that minimizes the MSE. <a data-type="xref" href="#regression_cart_cost_function">Equation 6-4</a> shows the cost function that the algorithm tries to minimize.<a data-primary="" data-startref="ix_decision_trees_regress" data-type="indexterm" id="idm45983117720304"></a><a data-primary="" data-startref="ix_regress_decision_tree" data-type="indexterm" id="idm45983117719392"></a></p>
+<div data-type="equation" id="regression_cart_cost_function">
+<h5 class="sigil_not_in_toc"><span class="label">Equation 6-4. </span>CART cost function for regression</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mi>J</mi><mrow><mo>(</mo><mi>k</mi><mo>,</mo><msub><mi>t</mi><mi>k</mi></msub><mo>)</mo></mrow><mo>=</mo><mfrac><msub><mi>m</mi><mtext>left</mtext></msub><mi>m</mi></mfrac><msub><mtext>MSE</mtext><mtext>left</mtext></msub><mo>+</mo><mfrac><msub><mi>m</mi><mtext>right</mtext></msub><mi>m</mi></mfrac><msub><mtext>MSE</mtext><mtext>right</mtext></msub><mspace width="1.em"/><mtext>where</mtext><mspace width="4.pt"/><mfenced close="" open="{" separators=""><mtable><mtr><mtd><msub><mtext>MSE</mtext><mtext>node</mtext></msub><mo>=</mo><mfrac><mrow><munder><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mtext>node</mtext></mrow></munder><msup><mrow><mo>(</mo><msub><mover><mi>y</mi><mo>^</mo></mover><mtext>node</mtext></msub><mo>-</mo><msup><mi>y</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msup><mo>)</mo></mrow><mn>2</mn></msup></mrow><msub><mi>m</mi><mi>node</mi></msub></mfrac></mtd></mtr><mtr><mtd><msub><mover><mi>y</mi><mo>^</mo></mover><mtext>node</mtext></msub><mo>=</mo><mfrac><mrow><munder><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mtext>node</mtext></mrow></munder><msup><mi>y</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msup></mrow><msub><mi>m</mi><mi>node</mi></msub></mfrac></mtd></mtr></mtable></mfenced></math>
+</div>
+<p>Just like for classification tasks, decision trees are prone to overfitting when dealing with regression tasks. Without any regularization (i.e., using the default hyperparameters), you get the predictions on the left in <a data-type="xref" href="#tree_regression_regularization_plot">Figure 6-6</a>. <a data-primary="overfitting of data" data-secondary="and decision trees" data-secondary-sortas="decision trees" data-type="indexterm" id="idm45983117693104"></a>These predictions are obviously overfitting the training set very badly. Just setting <code>min_samples_leaf=10</code> results in a much more reasonable model, represented on the right in <a data-type="xref" href="#tree_regression_regularization_plot">Figure 6-6</a>.</p>
+<figure class="width-90"><div class="figure" id="tree_regression_regularization_plot">
+<img alt="mls3 0606" height="227" src="../Images/mls3_0606.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 6-6. </span>Predictions of an unregularized regression tree (left) and a regularized tree (right)</h6>
+</div>
+</figure>
+</div>
+</section>
+<section data-pdf-bookmark="Sensitivity to Axis Orientation" data-type="sect1"><div class="sect1" id="idm45983117849904">
+<h2 id="sigil_toc_id_122">Sensitivity to Axis Orientation</h2>
+<p>Hopefully by now you are convinced that decision trees have a lot going for them: they are relatively easy to understand and interpret, simple to use, versatile, and powerful. <a data-primary="decision trees" data-secondary="sensitivity to axis orientation" data-type="indexterm" id="idm45983117686736"></a>However, they do have a few limitations. First, as you may have noticed, decision trees love orthogonal decision boundaries (all splits are perpendicular to an axis), which makes them sensitive to the data’s orientation. For example, <a data-type="xref" href="#sensitivity_to_rotation_plot">Figure 6-7</a> shows a simple linearly separable dataset: on the left, a decision tree can split it easily, while on the right, after the dataset is rotated by 45°, the decision boundary looks unnecessarily convoluted. Although both decision trees fit the training set perfectly, it is very likely that the model on the right will not generalize well.</p>
+<figure><div class="figure" id="sensitivity_to_rotation_plot">
+<img alt="mls3 0607" height="227" src="../Images/mls3_0607.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 6-7. </span>Sensitivity to training set rotation</h6>
+</div>
+</figure>
+<p>One way to limit this problem is to scale the data, then apply a principal component analysis transformation. <a data-primary="principal component analysis (PCA)" data-secondary="for scaling data in decision trees" data-secondary-sortas="scaling data in decision trees" data-type="indexterm" id="idm45983117682256"></a>We will look at PCA in detail in <a data-type="xref" href="HOMLWSKT012.xhtml#dimensionality_chapter">Chapter 8</a>, but for now you only need to know that it rotates the data in a way that reduces the correlation between the features, which often (not always) makes things easier for trees.</p>
+<p><a data-primary="DecisionTreeClassifier" data-type="indexterm" id="idm45983117679536"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.tree.DecisionTreeClassifier" data-type="indexterm" id="idm45983117678608"></a>Let’s create a small pipeline that scales the data and rotates it using PCA, then train a <code>DecisionTreeClassifier</code> on that data. <a data-type="xref" href="#pca_preprocessing_plot">Figure 6-8</a> shows the decision boundaries of that tree: as you can see, the rotation makes it possible to fit the dataset pretty well using only one feature, <em>z</em><sub>1</sub>, which is a linear function of the original petal length and width.<a data-primary="decision boundaries" data-type="indexterm" id="idm45983117675328"></a> Here’s the code:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.decomposition</code> <code class="kn">import</code> <code class="n">PCA</code>
+<code class="kn">from</code> <code class="nn">sklearn.pipeline</code> <code class="kn">import</code> <code class="n">make_pipeline</code>
+<code class="kn">from</code> <code class="nn">sklearn.preprocessing</code> <code class="kn">import</code> <code class="n">StandardScaler</code>
+
+<code class="n">pca_pipeline</code> <code class="o">=</code> <code class="n">make_pipeline</code><code class="p">(</code><code class="n">StandardScaler</code><code class="p">(),</code> <code class="n">PCA</code><code class="p">())</code>
+<code class="n">X_iris_rotated</code> <code class="o">=</code> <code class="n">pca_pipeline</code><code class="o">.</code><code class="n">fit_transform</code><code class="p">(</code><code class="n">X_iris</code><code class="p">)</code>
+<code class="n">tree_clf_pca</code> <code class="o">=</code> <code class="n">DecisionTreeClassifier</code><code class="p">(</code><code class="n">max_depth</code><code class="o">=</code><code class="mi">2</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">tree_clf_pca</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_iris_rotated</code><code class="p">,</code> <code class="n">y_iris</code><code class="p">)</code></pre>
+<figure><div class="figure" id="pca_preprocessing_plot">
+<img alt="mls3 0608" height="286" src="../Images/mls3_0608.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 6-8. </span>A tree’s decision boundaries on the scaled and PCA-rotated iris dataset</h6>
+</div>
+</figure>
+</div>
+</section>
+<section data-pdf-bookmark="Decision Trees Have a High Variance" data-type="sect1"><div class="sect1" id="idm45983117637440">
+<h2 id="sigil_toc_id_123">Decision Trees Have a High Variance</h2>
+<p>More generally, the main issue with decision trees is that they have quite a high variance: small changes to the hyperparameters or to the data may produce very different models. <a data-primary="decision trees" data-secondary="high variance with" data-type="indexterm" id="idm45983117635728"></a><a data-primary="high variance, with decision trees" data-type="indexterm" id="idm45983117634752"></a><a data-primary="variance" data-secondary="high variance with decision trees" data-type="indexterm" id="idm45983117634112"></a>In fact, since the training algorithm used by Scikit-Learn is stochastic—it randomly selects the set of features to evaluate at each node—even retraining the same decision tree on the exact same data may produce a very different model, such as the one represented in <a data-type="xref" href="#decision_tree_high_variance_plot">Figure 6-9</a> (unless you set the <code>random_state</code> hyperparameter). As you can see, it looks very different from the previous decision tree (<a data-type="xref" href="#decision_tree_decision_boundaries_plot">Figure 6-2</a>).</p>
+<figure><div class="figure" id="decision_tree_high_variance_plot">
+<img alt="mls3 0609" height="287" src="../Images/mls3_0609.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 6-9. </span>Retraining the same model on the same data may produce a very different model</h6>
+</div>
+</figure>
+<p>Luckily, by averaging predictions over many trees, it’s possible to reduce variance significantly. Such an <em>ensemble</em> of trees is called a <em>random forest</em>, and it’s one of the most powerful types of models available today, as you will see in the next chapter.<a data-primary="" data-startref="ix_decision_trees_ch6" data-type="indexterm" id="idm45983117578992"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Exercises" data-type="sect1"><div class="sect1" id="idm45983117577888">
+<h2 id="sigil_toc_id_124">Exercises</h2>
+<ol>
+<li>
+<p>What is the approximate depth of a decision tree trained (without restrictions) on a training set with one million instances?</p>
+</li>
+<li>
+<p>Is a node’s Gini impurity generally lower or higher than its parent’s? Is it <em>generally</em> lower/higher, or <em>always</em> lower/higher?</p>
+</li>
+<li>
+<p>If a decision tree is overfitting the training set, is it a good idea to try decreasing <code>max_depth</code>?</p>
+</li>
+<li>
+<p>If a decision tree is underfitting the training set, is it a good idea to try scaling the input features?</p>
+</li>
+<li>
+<p>If it takes one hour to train a decision tree on a training set containing one million instances, roughly how much time will it take to train another decision tree on a training set containing ten million instances? Hint: consider the CART algorithm’s computational complexity.</p>
+</li>
+<li>
+<p>If it takes one hour to train a decision tree on a given training set, roughly how much time will it take if you double the number of features?</p>
+</li>
+<li>
+<p>Train and fine-tune a decision tree for the moons dataset by following these steps:</p>
+<ol>
+<li>
+<p>Use <code>make_moons(n_samples=10000, noise=0.4)</code> to generate a moons dataset.</p>
+</li>
+<li>
+<p>Use <code>train_test_split()</code> to split the dataset into a training set and a test set.</p>
+</li>
+<li>
+<p>Use grid search with cross-validation (with the help of the <code>GridSearchCV</code> class) to find good hyperparameter values for a <code>DecisionTreeClassifier</code>. Hint: try various values for <code>max_leaf_nodes</code>.</p>
+</li>
+<li>
+<p>Train it on the full training set using these hyperparameters, and measure your model’s performance on the test set. You should get roughly 85% to 87% accuracy.</p>
+</li>
+</ol>
+</li>
+<li>
+<p>Grow a forest by following these steps:</p>
+<ol>
+<li>
+<p>Continuing the previous exercise, generate 1,000 subsets of the training set, each containing 100 instances selected randomly. Hint: you can use Scikit-Learn’s <code>ShuffleSplit</code> class for this.</p>
+</li>
+<li>
+<p>Train one decision tree on each subset, using the best hyperparameter values found in the previous exercise. Evaluate these 1,000 decision trees on the test set. Since they were trained on smaller sets, these decision trees will likely perform worse than the first decision tree, achieving only about 80% <span class="keep-together">accuracy</span>.</p>
+</li>
+<li>
+<p>Now comes the magic. <a data-primary="majority-vote predictions" data-type="indexterm" id="idm45983117557728"></a>For each test set instance, generate the predictions of the 1,000 decision trees, and keep only the most frequent prediction (you can use SciPy’s <code>mode()</code> function for this). This approach gives you <em>majority-vote predictions</em> over the test set.</p>
+</li>
+<li>
+<p>Evaluate these predictions on the test set: you should obtain a slightly higher accuracy than your first model (about 0.5 to 1.5% higher). Congratulations, you have trained a random forest classifier!</p>
+</li>
+</ol>
+</li>
+</ol>
+<p>Solutions to these exercises are available at the end of this chapter’s notebook, at <a href="https://homl.info/colab3"><em class="hyperlink">https://homl.info/colab3</em></a>.</p>
+</div>
+</section>
+<div data-type="footnotes"><p data-type="footnote" id="idm45983118104640"><sup><a href="#idm45983118104640-marker">1</a></sup> P is the set of problems that can be solved in <em>polynomial time</em> (i.e., a polynomial of the dataset size). <a data-primary="NP-Complete problem, CART as" data-type="indexterm" id="idm45983118103664"></a><a data-primary="polynomial time" data-type="indexterm" id="idm45983118103056"></a>NP is the set of problems whose solutions can be verified in polynomial time. An NP-hard problem is a problem that can be reduced to a known NP-hard problem in polynomial time. An NP-complete problem is both NP and NP-hard. A major open mathematical question is whether or not P = NP. If P ≠ NP (which seems likely), then no polynomial algorithm will ever be found for any NP-complete problem (except perhaps one day on a quantum computer).</p>
+<p data-type="footnote" id="idm45983118055568"><sup><a href="#idm45983118055568-marker">2</a></sup> See Sebastian Raschka’s <a href="https://homl.info/19">interesting analysis</a> for more details.</p>
+</div>
+</div>
+</section>
+</div>
+</body>
+</html>

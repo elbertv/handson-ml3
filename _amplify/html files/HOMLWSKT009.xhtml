@@ -1,0 +1,946 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+<title>5. Support Vector Machines</title>
+<link href="../Styles/epub.css" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+<div id="sbo-rt-content"><section data-pdf-bookmark="Chapter 5. Support Vector Machines" data-type="chapter" epub:type="chapter"><div class="chapter" id="svm_chapter">
+<h1><span class="label">Chapter 5. </span>Support Vector Machines</h1>
+<p>A <em>support vector machine</em> (SVM) is a powerful and versatile machine learning model, capable of performing linear or nonlinear classification, regression, and even novelty detection. <a data-primary="support vector machines (SVMs)" data-type="indexterm" id="ix_svms_ch5"></a>SVMs shine with small to medium-sized nonlinear datasets (i.e., hundreds to thousands of instances), especially for classification tasks. However, they don’t scale very well to very large datasets, as you will see.</p>
+<p>This chapter will explain the core concepts of SVMs, how to use them, and how they work. Let’s jump right in!</p>
+<section data-pdf-bookmark="Linear SVM Classification" data-type="sect1"><div class="sect1" id="idm45983119972672">
+<h2 id="sigil_toc_id_102">Linear SVM Classification</h2>
+<p>The fundamental idea behind SVMs is best explained with some visuals. <a data-type="xref" href="#large_margin_classification_plot">Figure 5-1</a> shows part of the iris dataset that was introduced at the end of <a data-type="xref" href="HOMLWSKT008.xhtml#linear_models_chapter">Chapter 4</a>. <a data-primary="linear models" data-secondary="SVM" data-type="indexterm" id="ix_lin_mod_svm"></a><a data-primary="linear SVM classification" data-type="indexterm" id="ix_linear_svm_class"></a><a data-primary="support vector machines (SVMs)" data-secondary="linear classification" data-type="indexterm" id="ix_svm_lin_class"></a><a data-primary="linearly separable, SVM classes" data-type="indexterm" id="ix_linear_sep_svm"></a>The two classes can clearly be separated easily with a straight line (they are <em>linearly separable</em>). The left plot shows the decision boundaries of three possible linear classifiers. The model whose decision boundary is represented by the dashed line is so bad that it does not even separate the classes properly. The other two models work perfectly on this training set, but their decision boundaries come so close to the instances that these models will probably not perform as well on new instances. In contrast, the solid line in the plot on the right represents the decision boundary of an SVM classifier; this line not only separates the two classes but also stays as far away from the closest training instances as possible. You can think of an SVM classifier as fitting the widest possible street (represented by the parallel dashed lines) between the classes. <a data-primary="large margin classification" data-type="indexterm" id="idm45983119964240"></a>This is called <em>large margin classification</em>.</p>
+<figure><div class="figure" id="large_margin_classification_plot">
+<img alt="mls3 0501" height="132" src="../Images/mls3_0501.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-1. </span>Large margin classification</h6>
+</div>
+</figure>
+<p>Notice that adding more training instances “off the street” will not affect the decision boundary at all: it is fully determined (or “supported”) by the instances located on the edge of the street. <a data-primary="support vectors" data-type="indexterm" id="idm45983119960704"></a>These instances are called the <em>support vectors</em> (they are circled in <a data-type="xref" href="#large_margin_classification_plot">Figure 5-1</a>).</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>SVMs are sensitive to the feature scales, as you can see in <a data-type="xref" href="#sensitivity_to_feature_scales_plot">Figure 5-2</a>. In the left plot, the vertical scale is much larger than the horizontal scale, so the widest possible street is close to horizontal. <a data-primary="feature scaling" data-type="indexterm" id="idm45983119956656"></a>After feature scaling (e.g., using Scikit-Learn’s <code>StandardScaler</code>), the decision boundary in the right plot looks much better.<a data-primary="" data-startref="ix_linear_sep_svm" data-type="indexterm" id="idm45983119955408"></a></p>
+</div>
+<figure><div class="figure" id="sensitivity_to_feature_scales_plot">
+<img alt="mls3 0502" height="153" src="../Images/mls3_0502.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-2. </span>Sensitivity to feature scales</h6>
+</div>
+</figure>
+<section data-pdf-bookmark="Soft Margin Classification" data-type="sect2"><div class="sect2" id="idm45983119952224">
+<h2 id="sigil_toc_id_103" class="sigil_not_in_toc">Soft Margin Classification</h2>
+<p>If we strictly impose that all instances must be off the street and on the correct side, this is called <em>hard margin classification</em>. <a data-primary="classification" data-secondary="hard margin" data-type="indexterm" id="idm45983119949952"></a><a data-primary="hard margin classification" data-type="indexterm" id="idm45983119948976"></a>There are two main issues with hard margin classification. First, it only works if the data is linearly separable. Second, it is sensitive to outliers. <a data-type="xref" href="#sensitivity_to_outliers_plot">Figure 5-3</a> shows the iris dataset with just one additional outlier: on the left, it is impossible to find a hard margin; on the right, the decision boundary ends up very different from the one we saw in <a data-type="xref" href="#large_margin_classification_plot">Figure 5-1</a> without the outlier, and the model will probably not generalize as well.</p>
+<figure><div class="figure" id="sensitivity_to_outliers_plot">
+<img alt="mls3 0503" height="141" src="../Images/mls3_0503.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-3. </span>Hard margin sensitivity to outliers</h6>
+</div>
+</figure>
+<p>To avoid these issues, we need to use a more flexible model. <a data-primary="margin violations" data-type="indexterm" id="idm45983119944112"></a>The objective is to find a good balance between keeping the street as large as possible and limiting the <em>margin violations</em> (i.e., instances that end up in the middle of the street or even on the wrong side). <a data-primary="soft margin classification" data-type="indexterm" id="ix_soft_margin_class"></a><a data-primary="classification" data-secondary="soft margin" data-type="indexterm" id="ix_classif_soft_margin"></a>This is called <em>soft margin classification</em>.</p>
+<p>When creating an SVM model using Scikit-Learn, you can specify several hyperparameters, including the regularization hyperparameter <code>C</code>. If you set it to a low value, then you end up with the model on the left of <a data-type="xref" href="#regularization_plot">Figure 5-4</a>. With a high value, you get the model on the right. As you can see, reducing <code>C</code> makes the street larger, but it also leads to more margin violations. In other words, reducing <code>C</code> results in more instances supporting the street, so there’s less risk of overfitting. But if you reduce it too much, then the model ends up underfitting, as seems to be the case here: the model with <code>C=100</code> looks like it will generalize better than the one with <code>C=1</code>.</p>
+<figure><div class="figure" id="regularization_plot">
+<img alt="mls3 0504" height="141" src="../Images/mls3_0504.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-4. </span>Large margin (left) versus fewer margin violations (right)</h6>
+</div>
+</figure>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>If your SVM model is overfitting, you can try regularizing it by reducing <code>C</code>.<a data-primary="overfitting of data" data-secondary="SVM model" data-type="indexterm" id="idm45983119932720"></a></p>
+</div>
+<p>The following Scikit-Learn code loads the iris dataset and trains a linear SVM classifier to detect <em>Iris virginica</em> flowers. <a data-primary="pipelines" data-type="indexterm" id="idm45983119930448"></a>The pipeline first scales the features, then uses a <code>LinearSVC</code> with <code>C=1</code>:<a data-primary="LinearSVC" data-type="indexterm" id="idm45983119928688"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.svm.LinearSVC" data-type="indexterm" id="idm45983119927952"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.datasets</code> <code class="kn">import</code> <code class="n">load_iris</code>
+<code class="kn">from</code> <code class="nn">sklearn.pipeline</code> <code class="kn">import</code> <code class="n">make_pipeline</code>
+<code class="kn">from</code> <code class="nn">sklearn.preprocessing</code> <code class="kn">import</code> <code class="n">StandardScaler</code>
+<code class="kn">from</code> <code class="nn">sklearn.svm</code> <code class="kn">import</code> <code class="n">LinearSVC</code>
+
+<code class="n">iris</code> <code class="o">=</code> <code class="n">load_iris</code><code class="p">(</code><code class="n">as_frame</code><code class="o">=</code><code class="kc">True</code><code class="p">)</code>
+<code class="n">X</code> <code class="o">=</code> <code class="n">iris</code><code class="o">.</code><code class="n">data</code><code class="p">[[</code><code class="s2">"petal length (cm)"</code><code class="p">,</code> <code class="s2">"petal width (cm)"</code><code class="p">]]</code><code class="o">.</code><code class="n">values</code>
+<code class="n">y</code> <code class="o">=</code> <code class="p">(</code><code class="n">iris</code><code class="o">.</code><code class="n">target</code> <code class="o">==</code> <code class="mi">2</code><code class="p">)</code>  <code class="c1"># Iris virginica</code>
+
+<code class="n">svm_clf</code> <code class="o">=</code> <code class="n">make_pipeline</code><code class="p">(</code><code class="n">StandardScaler</code><code class="p">(),</code>
+                        <code class="n">LinearSVC</code><code class="p">(</code><code class="n">C</code><code class="o">=</code><code class="mi">1</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">))</code>
+<code class="n">svm_clf</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">,</code> <code class="n">y</code><code class="p">)</code></pre>
+<p>The resulting model is represented on the left in <a data-type="xref" href="#regularization_plot">Figure 5-4</a>.</p>
+<p>Then, as usual, you can use the model to make predictions:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">X_new</code> <code class="o">=</code> <code class="p">[[</code><code class="mf">5.5</code><code class="p">,</code> <code class="mf">1.7</code><code class="p">],</code> <code class="p">[</code><code class="mf">5.0</code><code class="p">,</code> <code class="mf">1.5</code><code class="p">]]</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">svm_clf</code><code class="o">.</code><code class="n">predict</code><code class="p">(</code><code class="n">X_new</code><code class="p">)</code>
+<code class="go">array([ True, False])</code></pre>
+<p>The first plant is classified as an <em>Iris virginica</em>, while the second is not. Let’s look at the scores that the SVM used to make these predictions. These measure the signed distance between each instance and the decision boundary:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">svm_clf</code><code class="o">.</code><code class="n">decision_function</code><code class="p">(</code><code class="n">X_new</code><code class="p">)</code>
+<code class="go">array([ 0.66163411, -0.22036063])</code></pre>
+<p>Unlike <code>LogisticRegression</code>, <code>LinearSVC</code> doesn’t have a <code>predict_proba()</code> method to estimate the class probabilities. That said, if you use the <code>SVC</code> class (discussed shortly) instead of <code>LinearSVC</code>, and if you set its <code>probability</code> hyperparameter to <code>True</code>, then the model will fit an extra model at the end of training to map the SVM decision function scores to estimated probabilities. <a data-primary="predict_log_proba()" data-type="indexterm" id="idm45983119781408"></a><a data-primary="predict_proba()" data-type="indexterm" id="idm45983119780704"></a>Under the hood, this requires using 5-fold cross-validation to generate out-of-sample predictions for every instance in the training set, then training a <code>LogisticRegression</code> model, so it will slow down training considerably. After that, the <code>predict_proba()</code> and 
+<span class="keep-together"><code>predict_log_proba()</code></span> methods will be available.<a data-primary="" data-startref="ix_lin_mod_svm" data-type="indexterm" id="idm45983119778224"></a><a data-primary="" data-startref="ix_linear_svm_class" data-type="indexterm" id="idm45983119777280"></a><a data-primary="" data-startref="ix_svm_lin_class" data-type="indexterm" id="idm45983119776336"></a><a data-primary="" data-startref="ix_soft_margin_class" data-type="indexterm" id="idm45983119775392"></a><a data-primary="" data-startref="ix_classif_soft_margin" data-type="indexterm" id="idm45983119729568"></a></p>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Nonlinear SVM Classification" data-type="sect1"><div class="sect1" id="idm45983119951728">
+<h2 id="sigil_toc_id_104">Nonlinear SVM Classification</h2>
+<p>Although linear SVM classifiers are efficient and often work surprisingly well, many datasets are not even close to being linearly separable. <a data-primary="support vector machines (SVMs)" data-secondary="nonlinear classifiers" data-type="indexterm" id="ix_svm_nonlinear_class"></a><a data-primary="nonlinear SVM classifiers" data-type="indexterm" id="ix_nonlinear_svm"></a>One approach to handling nonlinear datasets is to add more features, such as polynomial features (as we did in <a data-type="xref" href="HOMLWSKT008.xhtml#linear_models_chapter">Chapter 4</a>); in some cases this can result in a linearly separable dataset. Consider the lefthand plot in <a data-type="xref" href="#higher_dimensions_plot">Figure 5-5</a>: it represents a simple dataset with just one feature, <em>x</em><sub>1</sub>. This dataset is not linearly separable, as you can see. But if you add a second feature <em>x</em><sub>2</sub> = (<em>x</em><sub>1</sub>)<sup>2</sup>, the resulting 2D dataset is perfectly linearly separable.</p>
+<figure><div class="figure" id="higher_dimensions_plot">
+<img alt="mls3 0505" height="186" src="../Images/mls3_0505.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-5. </span>Adding features to make a dataset linearly separable</h6>
+</div>
+</figure>
+<p>To implement this idea using Scikit-Learn, you can create a pipeline containing a <code>PolynomialFeatures</code> transformer (discussed in <a data-type="xref" href="HOMLWSKT008.xhtml#polynomial_regression">“Polynomial Regression”</a>), followed by a <code>StandardScaler</code> and a <code>LinearSVC</code> classifier. <a data-primary="Scikit-Learn" data-secondary="sklearn.preprocessing.StandardScaler" data-type="indexterm" id="idm45983119716112"></a><a data-primary="StandardScaler" data-type="indexterm" id="idm45983119715136"></a>Let’s test this on the moons dataset, <a data-primary="PolynomialFeatures" data-type="indexterm" id="idm45983119714336"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.datasets.make_moons()" data-type="indexterm" id="idm45983119713664"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.preprocessing.PolynomialFeatures" data-type="indexterm" id="idm45983119712752"></a>a toy dataset for binary classification in which the data points are shaped as two interleaving crescent moons (see <a data-type="xref" href="#moons_polynomial_svc_plot">Figure 5-6</a>). You can generate this dataset using the <code>make_moons()</code> function:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.datasets</code> <code class="kn">import</code> <code class="n">make_moons</code>
+<code class="kn">from</code> <code class="nn">sklearn.preprocessing</code> <code class="kn">import</code> <code class="n">PolynomialFeatures</code>
+
+<code class="n">X</code><code class="p">,</code> <code class="n">y</code> <code class="o">=</code> <code class="n">make_moons</code><code class="p">(</code><code class="n">n_samples</code><code class="o">=</code><code class="mi">100</code><code class="p">,</code> <code class="n">noise</code><code class="o">=</code><code class="mf">0.15</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+
+<code class="n">polynomial_svm_clf</code> <code class="o">=</code> <code class="n">make_pipeline</code><code class="p">(</code>
+    <code class="n">PolynomialFeatures</code><code class="p">(</code><code class="n">degree</code><code class="o">=</code><code class="mi">3</code><code class="p">),</code>
+    <code class="n">StandardScaler</code><code class="p">(),</code>
+    <code class="n">LinearSVC</code><code class="p">(</code><code class="n">C</code><code class="o">=</code><code class="mi">10</code><code class="p">,</code> <code class="n">max_iter</code><code class="o">=</code><code class="mi">10_000</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="p">)</code>
+<code class="n">polynomial_svm_clf</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">,</code> <code class="n">y</code><code class="p">)</code></pre>
+<figure class="smallerfifty"><div class="figure" id="moons_polynomial_svc_plot">
+<img alt="mls3 0506" height="382" src="../Images/mls3_0506.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-6. </span>Linear SVM classifier using polynomial features</h6>
+</div>
+</figure>
+<section data-pdf-bookmark="Polynomial Kernel" data-type="sect2"><div class="sect2" id="idm45983119652976">
+<h2 id="sigil_toc_id_105" class="sigil_not_in_toc">Polynomial Kernel</h2>
+<p>Adding polynomial features is simple to implement and can work great with all sorts of machine learning algorithms (not just SVMs). <a data-primary="polynomial features, SVM classifiers" data-type="indexterm" id="idm45983119651408"></a>That said, at a low polynomial degree this method cannot deal with very complex datasets, and with a high polynomial degree it creates a huge number of features, making the model too slow.</p>
+<p>Fortunately, when using SVMs you can apply an almost miraculous mathematical technique called the <em>kernel trick</em> (which is explained later in this chapter). <a data-primary="kernel trick" data-type="indexterm" id="ix_kernel_trick"></a>The kernel trick makes it possible to get the same result as if you had added many polynomial features, even with a very high degree, without actually having to add them. <a data-primary="Scikit-Learn" data-secondary="sklearn.svm.SVC" data-type="indexterm" id="idm45983119648400"></a><a data-primary="SVC class" data-type="indexterm" id="idm45983119647456"></a>This means there’s no combinatorial explosion of the number of features. This trick is implemented by the <code>SVC</code> class. Let’s test it on the moons dataset:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.svm</code> <code class="kn">import</code> <code class="n">SVC</code>
+
+<code class="n">poly_kernel_svm_clf</code> <code class="o">=</code> <code class="n">make_pipeline</code><code class="p">(</code><code class="n">StandardScaler</code><code class="p">(),</code>
+                                    <code class="n">SVC</code><code class="p">(</code><code class="n">kernel</code><code class="o">=</code><code class="s2">"poly"</code><code class="p">,</code> <code class="n">degree</code><code class="o">=</code><code class="mi">3</code><code class="p">,</code> <code class="n">coef0</code><code class="o">=</code><code class="mi">1</code><code class="p">,</code> <code class="n">C</code><code class="o">=</code><code class="mi">5</code><code class="p">))</code>
+<code class="n">poly_kernel_svm_clf</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">,</code> <code class="n">y</code><code class="p">)</code></pre>
+<p>This code trains an SVM classifier using a third-degree polynomial kernel, <a data-primary="hyperparameters" data-secondary="SVM classifiers with polynomial kernel" data-type="indexterm" id="idm45983119586240"></a><a data-primary="polynomial kernel" data-type="indexterm" id="idm45983119570672"></a>represented on the left in <a data-type="xref" href="#moons_kernelized_polynomial_svc_plot">Figure 5-7</a>. On the right is another SVM classifier using a 10th-degree polynomial kernel. <a data-primary="data" data-secondary="underfitting of" data-type="indexterm" id="idm45983119534752"></a>Obviously, if your model is overfitting, you might want to reduce the polynomial degree. Conversely, if it is underfitting, you can try increasing it. The hyperparameter <code>coef0</code> controls how much the model is influenced by high-degree terms versus low-degree terms.</p>
+<figure><div class="figure" id="moons_kernelized_polynomial_svc_plot">
+<img alt="mls3 0507" height="211" src="../Images/mls3_0507.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-7. </span>SVM classifiers with a polynomial kernel</h6>
+</div>
+</figure>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>Although hyperparameters will generally be tuned automatically (e.g., using randomized search), it’s good to have a sense of what each hyperparameter actually does and how it may interact with other hyperparameters: this way, you can narrow the search to a much smaller space.</p>
+</div>
+</div>
+</section>
+<section data-pdf-bookmark="Similarity Features" data-type="sect2"><div class="sect2" id="idm45983119530208">
+<h2 id="sigil_toc_id_106" class="sigil_not_in_toc">Similarity Features</h2>
+<p>Another technique<a data-primary="landmarks" data-type="indexterm" id="idm45983119528608"></a><a data-primary="similarity features, SVM" data-type="indexterm" id="idm45983119527872"></a> to tackle nonlinear problems is to add features computed using a similarity function, which measures how much each instance resembles a particular <em>landmark</em>, as we did in <a data-type="xref" href="HOMLWSKT006.xhtml#project_chapter">Chapter 2</a> when we added the geographic similarity features. For example, let’s take the 1D dataset from earlier and add two landmarks to it at <em>x</em><sub>1</sub> = –2 and <em>x</em><sub>1</sub> = 1 (see the left plot in <a data-type="xref" href="#kernel_method_plot">Figure 5-8</a>). Next, we’ll define the similarity function to be the Gaussian RBF with <em>γ</em> = 0.3. This is a bell-shaped function varying from 0 (very far away from the landmark) to 1 (at the landmark).</p>
+<p>Now we are ready to compute the new features. For example, let’s look at the instance <em>x</em><sub>1</sub> = –1: it is located at a distance of 1 from the first landmark and 2 from the second landmark. Therefore, its new features are <em>x</em><sub>2</sub> = exp(–0.3 × 1<sup>2</sup>) ≈ 0.74 and <em>x</em><sub>3</sub> = exp(–0.3 × 2<sup>2</sup>) ≈ 0.30. The plot on the right in <a data-type="xref" href="#kernel_method_plot">Figure 5-8</a> shows the transformed dataset (dropping the original features). As you can see, it is now linearly <span class="keep-together">separable</span>.</p>
+<figure><div class="figure" id="kernel_method_plot">
+<img alt="mls3 0508" height="212" src="../Images/mls3_0508.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-8. </span>Similarity features using the Gaussian RBF</h6>
+</div>
+</figure>
+<p>You may wonder how to select the landmarks. <a data-primary="linearly separable, SVM classes" data-type="indexterm" id="idm45983119515008"></a>The simplest approach is to create a landmark at the location of each and every instance in the dataset. Doing that creates many dimensions and thus increases the chances that the transformed training set will be linearly separable. The downside is that a training set with <em>m</em> instances and <em>n</em> features gets transformed into a training set with <em>m</em> instances and <em>m</em> features (assuming you drop the original features). If your training set is very large, you end up with an equally large number of features.</p>
+</div>
+</section>
+<section data-pdf-bookmark="Gaussian RBF Kernel" data-type="sect2"><div class="sect2" id="idm45983119512352">
+<h2 id="sigil_toc_id_107" class="sigil_not_in_toc">Gaussian RBF Kernel</h2>
+<p>Just like the polynomial features method, the similarity features method can be useful with any machine learning algorithm, but it may be computationally expensive to compute all the additional features (especially on large training sets). <a data-primary="Gaussian RBF kernel" data-type="indexterm" id="ix_gaussian_rbf"></a>Once again the kernel trick does its SVM magic, making it possible to obtain a similar result as if you had added many similarity features, but without actually doing so. Let’s try the <code>SVC</code> class with the Gaussian RBF <span class="keep-together">kernel</span>:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">rbf_kernel_svm_clf</code> <code class="o">=</code> <code class="n">make_pipeline</code><code class="p">(</code><code class="n">StandardScaler</code><code class="p">(),</code>
+                                   <code class="n">SVC</code><code class="p">(</code><code class="n">kernel</code><code class="o">=</code><code class="s2">"rbf"</code><code class="p">,</code> <code class="n">gamma</code><code class="o">=</code><code class="mi">5</code><code class="p">,</code> <code class="n">C</code><code class="o">=</code><code class="mf">0.001</code><code class="p">))</code>
+<code class="n">rbf_kernel_svm_clf</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">,</code> <code class="n">y</code><code class="p">)</code></pre>
+<p>This <a data-primary="γ (gamma) value" data-type="indexterm" id="idm45983119488416"></a><a data-primary="hyperparameters" data-secondary="gamma (γ) value" data-type="indexterm" id="idm45983119487376"></a><a data-primary="gamma (γ) value" data-type="indexterm" id="idm45983119486464"></a><a data-primary="overfitting of data" data-secondary="gamma (γ) hyperparameter to adjust" data-type="indexterm" id="idm45983119485792"></a>model is represented at the bottom left in <a data-type="xref" href="#moons_rbf_svc_plot">Figure 5-9</a>. The other plots show models trained with different values of hyperparameters <code>gamma</code> (<em>γ</em>) and <code>C</code>. Increasing <code>gamma</code> makes the bell-shaped curve narrower (see the lefthand plots in <a data-type="xref" href="#kernel_method_plot">Figure 5-8</a>). As a result, each instance’s range of influence is smaller: the decision boundary ends up being more irregular, wiggling around individual instances. Conversely, a small <code>gamma</code> value makes the bell-shaped curve wider: instances have a larger range of influence, and the decision boundary ends up smoother. <a data-primary="underfitting of data" data-type="indexterm" id="idm45983119480640"></a>So <em>γ</em> acts like a regularization <span class="keep-together">hyperparameter</span>: if your model is overfitting, you should reduce <em>γ</em>; if it is underfitting, you should increase <em>γ</em> (similar to the <code>C</code> hyperparameter).</p>
+<figure><div class="figure" id="moons_rbf_svc_plot">
+<img alt="mls3 0509" height="389" src="../Images/mls3_0509.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-9. </span>SVM classifiers using an RBF kernel</h6>
+</div>
+</figure>
+<p>Other kernels exist but are used much more rarely. <a data-primary="string kernels" data-type="indexterm" id="idm45983119475440"></a>Some kernels are specialized for specific data structures. <em>String kernels</em> are sometimes used when classifying text documents or DNA sequences (e.g., using the string subsequence kernel or kernels based on the Levenshtein distance).<a data-primary="Levenshtein distance" data-type="indexterm" id="idm45983119474224"></a></p>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>With so many kernels to choose from, how can you decide which one to use? As a rule of thumb, you should always try the 
+<span class="keep-together">linear</span> kernel first. The <code>LinearSVC</code> class is much faster than 
+<span class="keep-together"><code>SVC(kernel="linear")</code></span>, especially if the training set is very large. If it is not too large, you should also try kernelized SVMs, starting with the Gaussian RBF kernel; it often works really well. Then, if you have spare time and computing power, you can experiment with a few other kernels using hyperparameter search. If there are kernels specialized for your training set’s data structure, make sure to give them a try too.</p>
+</div>
+</div>
+</section>
+<section data-pdf-bookmark="SVM Classes and Computational Complexity" data-type="sect2"><div class="sect2" id="idm45983119470176">
+<h2 id="sigil_toc_id_108" class="sigil_not_in_toc">SVM Classes and Computational Complexity</h2>
+<p>The <code>LinearSVC</code> class is based on the <code>liblinear</code> library, which implements an <a href="https://homl.info/13">optimized algorithm</a> for linear SVMs.⁠<sup><a data-type="noteref" href="#idm45983119431792" id="idm45983119431792-marker">1</a></sup> <a data-primary="computational complexity" data-secondary="and SVM classes" data-secondary-sortas="SVM classes" data-type="indexterm" id="idm45983119430672"></a><a data-primary="liblinear library" data-type="indexterm" id="idm45983119429584"></a><a data-primary="LinearSVC" data-type="indexterm" id="idm45983119428976"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.svm.LinearSVC" data-type="indexterm" id="idm45983119428336"></a>It does not support the kernel trick, but it scales almost linearly with the number of training instances and the number of features. Its training time complexity is roughly <em>O</em>(<em>m</em> × <em>n</em>). <a data-primary="hyperparameters" data-secondary="tolerance (ε)" data-type="indexterm" id="idm45983119425792"></a><a data-primary="tolerance (ε)" data-type="indexterm" id="idm45983119424784"></a><a data-primary="ε (tolerance)" data-type="indexterm" id="idm45983119424112"></a>The algorithm takes longer if you require very high precision. This is controlled by the tolerance hyperparameter <em>ϵ</em> (called <code>tol</code> in Scikit-Learn). In most classification tasks, the default tolerance is fine.<a data-primary="Scikit-Learn" data-secondary="SVM classification classes" data-type="indexterm" id="idm45983119422352"></a></p>
+<p>The <code>SVC</code> class is based on the <code>libsvm</code> library, which implements an <a href="https://homl.info/14">algorithm that supports the kernel trick</a>.⁠<sup><a data-type="noteref" href="#idm45983119419280" id="idm45983119419280-marker">2</a></sup> The training time complexity is usually between <em>O</em>(<em>m</em><sup>2</sup> × <em>n</em>) and <em>O</em>(<em>m</em><sup>3</sup> × <em>n</em>). <a data-primary="SVC class" data-type="indexterm" id="idm45983119415328"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.svm.SVC" data-type="indexterm" id="idm45983119414592"></a><a data-primary="libsvm library" data-type="indexterm" id="idm45983119413648"></a>Unfortunately, this means that it gets dreadfully slow when the number of training instances gets large (e.g., hundreds of thousands of instances), so this algorithm is best for small or medium-sized nonlinear training sets. <a data-primary="sparse features, SVC class" data-type="indexterm" id="idm45983119412848"></a>It scales well with the number of features, especially with sparse features (i.e., when each instance has few nonzero features). In this case, the algorithm scales roughly with the average number of nonzero features per instance.</p>
+<p>The <code>SGDClassifier</code> class also performs large margin classification by default, and its hyperparameters–especially the regularization hyperparameters (<code>alpha</code> and <code>penalty</code>) and the <code>learning_rate</code>–can be adjusted to produce similar results as the linear SVMs. <a data-primary="SGDClassifier" data-type="indexterm" id="idm45983119409840"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.linear_model.SGDClassifier" data-type="indexterm" id="idm45983119409136"></a><a data-primary="hyperparameters" data-secondary="SGDClassifier" data-type="indexterm" id="idm45983119408224"></a><a data-primary="stochastic gradient descent (SGD)" data-type="indexterm" id="idm45983119407280"></a>For training it uses stochastic gradient descent (see <a data-type="xref" href="HOMLWSKT008.xhtml#linear_models_chapter">Chapter 4</a>), which allows incremental learning and uses little memory, so you can use it to train a model on a large dataset that does not fit in RAM (i.e., for out-of-core learning). Moreover, it scales very well, as its computational complexity is <em>O</em>(<em>m</em> × <em>n</em>). <a data-type="xref" href="#svm_classification_algorithm_comparison">Table 5-1</a> compares Scikit-Learn’s SVM classification classes.</p>
+<table id="svm_classification_algorithm_comparison">
+<caption><span class="label">Table 5-1. </span>Comparison of Scikit-Learn classes for SVM classification</caption>
+<thead>
+<tr>
+<th>Class</th>
+<th>Time complexity</th>
+<th>Out-of-core support</th>
+<th>Scaling required</th>
+<th>Kernel trick</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><p><code>LinearSVC</code></p>
+</td>
+<td><p><em>O</em>(<em>m</em> × <em>n</em>)</p>
+</td>
+<td><p>No</p>
+</td>
+<td><p>Yes</p>
+</td>
+<td><p>No</p>
+</td>
+</tr>
+<tr>
+<td><p><code>SVC</code></p>
+</td>
+<td><p><em>O</em>(<em>m</em>² × <em>n</em>) to <em>O</em>(<em>m</em>³ × <em>n</em>)</p>
+</td>
+<td><p>No</p>
+</td>
+<td><p>Yes</p>
+</td>
+<td><p>Yes</p>
+</td>
+</tr>
+<tr>
+<td><p><code>SGDClassifier</code></p>
+</td>
+<td><p><em>O</em>(<em>m</em> × <em>n</em>)</p>
+</td>
+<td><p>Yes</p>
+</td>
+<td><p>Yes</p>
+</td>
+<td><p>No</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Now let’s see how the SVM algorithms can also be used for linear and nonlinear regression.<a data-primary="" data-startref="ix_nonlinear_svm" data-type="indexterm" id="idm45983119382736"></a><a data-primary="" data-startref="ix_svm_ nonlinear_class" data-type="indexterm" id="idm45983119381760"></a><a data-primary="" data-startref="ix_kernel_trick" data-type="indexterm" id="idm45983119380816"></a><a data-primary="" data-startref="ix_gaussian_rbf" data-type="indexterm" id="idm45983119379872"></a></p>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="SVM Regression" data-type="sect1"><div class="sect1" id="idm45983119728256">
+<h2 id="sigil_toc_id_109">SVM Regression</h2>
+<p>To use SVMs for regression instead of classification, the trick is to tweak the objective: instead of trying to fit the largest possible street between two classes while limiting margin violations, SVM regression tries to fit as many instances as possible <em>on</em> the street while limiting margin violations (i.e., instances <em>off</em> the street). The width of the street is controlled by a hyperparameter, <em>ϵ</em>. <a data-type="xref" href="#svm_regression_plot">Figure 5-10</a> shows two linear SVM regression models trained on some linear data, one with a small margin (<em>ϵ</em> = 0.5) and the other with a larger margin (<em>ϵ</em> = 1.2).<a data-primary="regression models" data-secondary="SVM" data-type="indexterm" id="ix_regress_mod_svm"></a><a data-primary="support vector machines (SVMs)" data-secondary="SVM regression" data-type="indexterm" id="ix_svm_regress"></a></p>
+<figure><div class="figure" id="svm_regression_plot">
+<img alt="mls3 0510" height="247" src="../Images/mls3_0510.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-10. </span>SVM regression</h6>
+</div>
+</figure>
+<p>Reducing <em>ϵ</em> increases the number of support vectors, which regularizes the model. <a data-primary="ε sensitive" data-type="indexterm" id="idm45983119368848"></a>Moreover, if you add more training instances within the margin, it will not affect the model’s predictions; thus, the model is said to be <em>ϵ-insensitive</em>.</p>
+<p>You can use Scikit-Learn’s <code>LinearSVR</code> class to perform linear SVM regression. The following code produces the model represented on the left in <a data-type="xref" href="#svm_regression_plot">Figure 5-10</a>:<a data-primary="LinearSVR" data-type="indexterm" id="ix_linearsvr"></a><a data-primary="" data-startref="ix_scikit_linearsvr" data-type="indexterm" id="idm45983119364672"></a></p>
+<pre class="less_space pagebreak-before" data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.svm</code> <code class="kn">import</code> <code class="n">LinearSVR</code>
+
+<code class="n">X</code><code class="p">,</code> <code class="n">y</code> <code class="o">=</code> <code class="p">[</code><code class="o">...</code><code class="p">]</code>  <code class="c1"># a linear dataset</code>
+<code class="n">svm_reg</code> <code class="o">=</code> <code class="n">make_pipeline</code><code class="p">(</code><code class="n">StandardScaler</code><code class="p">(),</code>
+                        <code class="n">LinearSVR</code><code class="p">(</code><code class="n">epsilon</code><code class="o">=</code><code class="mf">0.5</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">))</code>
+<code class="n">svm_reg</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">,</code> <code class="n">y</code><code class="p">)</code></pre>
+<p>To tackle nonlinear regression tasks, you can use a kernelized SVM model. <a data-type="xref" href="#svm_with_polynomial_kernel_plot">Figure 5-11</a> shows SVM regression on a random quadratic training set, using a second-degree polynomial kernel. There is some regularization in the left plot (i.e., a small <code>C</code> value), and much less in the right plot (i.e., a large <code>C</code> value).</p>
+<figure><div class="figure" id="svm_with_polynomial_kernel_plot">
+<img alt="mls3 0511" height="247" src="../Images/mls3_0511.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-11. </span>SVM regression using a second-degree polynomial kernel</h6>
+</div>
+</figure>
+<p>The following code uses Scikit-Learn’s <code>SVR</code> class (which supports the kernel trick) to produce the model represented on the left in <a data-type="xref" href="#svm_with_polynomial_kernel_plot">Figure 5-11</a>:<a data-primary="SVR class" data-type="indexterm" id="idm45983119304192"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.svm.SVR" data-type="indexterm" id="idm45983119303488"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.svm</code> <code class="kn">import</code> <code class="n">SVR</code>
+
+<code class="n">X</code><code class="p">,</code> <code class="n">y</code> <code class="o">=</code> <code class="p">[</code><code class="o">...</code><code class="p">]</code>  <code class="c1"># a quadratic dataset</code>
+<code class="n">svm_poly_reg</code> <code class="o">=</code> <code class="n">make_pipeline</code><code class="p">(</code><code class="n">StandardScaler</code><code class="p">(),</code>
+                             <code class="n">SVR</code><code class="p">(</code><code class="n">kernel</code><code class="o">=</code><code class="s2">"poly"</code><code class="p">,</code> <code class="n">degree</code><code class="o">=</code><code class="mi">2</code><code class="p">,</code> <code class="n">C</code><code class="o">=</code><code class="mf">0.01</code><code class="p">,</code> <code class="n">epsilon</code><code class="o">=</code><code class="mf">0.1</code><code class="p">))</code>
+<code class="n">svm_poly_reg</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">,</code> <code class="n">y</code><code class="p">)</code></pre>
+<p>The <code>SVR</code> class is the regression equivalent of the <code>SVC</code> class, and the <code>LinearSVR</code> class is the regression equivalent of the <code>LinearSVC</code> class. The <code>LinearSVR</code> class scales linearly with the size of the training set (just like the <code>LinearSVC</code> class), while the <code>SVR</code> class gets much too slow when the training set grows very large (just like the <code>SVC</code> class).</p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>SVMs can also be used for novelty detection, as you will see in <a data-type="xref" href="HOMLWSKT013.xhtml#unsupervised_learning_chapter">Chapter 9</a>.</p>
+</div>
+<p>The rest of this chapter explains how SVMs make predictions and how their training algorithms work, starting with linear SVM classifiers. If you are just getting started with machine learning, you can safely skip this and go straight to the exercises at the end of this chapter, and come back later when you want to get a deeper understanding of SVMs.<a data-primary="" data-startref="ix_regress_mod_svm" data-type="indexterm" id="idm45983119246032"></a><a data-primary="" data-startref="ix_scikit_linearsvr" data-type="indexterm" id="idm45983119245056"></a><a data-primary="" data-startref="ix_linearsvr" data-type="indexterm" id="idm45983119244112"></a><a data-primary="" data-startref="ix_svm_regress" data-type="indexterm" id="idm45983119243168"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Under the Hood of Linear SVM Classifiers" data-type="sect1"><div class="sect1" id="idm45983119378336">
+<h2 id="sigil_toc_id_110">Under the Hood of Linear SVM Classifiers</h2>
+<p>A linear SVM classifier predicts the class of a new instance <strong>x</strong> by first computing the decision function <strong>θ</strong><sup>⊺</sup> <strong>x</strong> = <em>θ</em><sub>0</sub> <em>x</em><sub>0</sub> + ⋯ + <em>θ</em><sub><em>n</em></sub> <em>x</em><sub><em>n</em></sub>, where <em>x</em><sub>0</sub> is the bias feature (always equal to 1). If the result is positive, then the predicted class <em>ŷ</em> is the positive class (1); otherwise it is the negative class (0). This is exactly like <code>LogisticRegression</code> (discussed in <a data-type="xref" href="HOMLWSKT008.xhtml#linear_models_chapter">Chapter 4</a>).<a data-primary="support vector machines (SVMs)" data-secondary="mechanics of" data-type="indexterm" id="ix_svms_mechanics"></a><a data-primary="linear SVM classification" data-type="indexterm" id="ix_linear_svm_class2"></a><a data-primary="predictions" data-secondary="with linear SVM classifier" data-secondary-sortas="linear SVM classifier" data-type="indexterm" id="idm45983119192032"></a></p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>Up to now, I have used the convention of putting all the model parameters in one vector <strong>θ</strong>, including the bias term <strong>θ</strong><sub>0</sub> and the input feature weights <strong>θ</strong><sub>1</sub> to <strong>θ</strong><sub><em>n</em></sub>. <a data-primary="model parameters" data-secondary="linear SVM classifier mechanics" data-type="indexterm" id="idm45983119186800"></a><a data-primary="feature vectors" data-type="indexterm" id="idm45983119185856"></a>This required adding a bias input <em>x</em><sub>0</sub> = 1 to all instances. Another very common convention is to separate the bias term <em>b</em> (equal to <strong>θ</strong><sub>0</sub>) and the feature weights vector <strong>w</strong> (containing <strong>θ</strong><sub>1</sub> to <strong>θ</strong><sub><em>n</em></sub>). <a data-primary="support vector machines (SVMs)" data-secondary="decision function" data-type="indexterm" id="ix_svms_decision_func"></a><a data-primary="decision function" data-type="indexterm" id="ix_decision_func"></a>In this case, no bias feature needs to be added to the input feature vectors, and the linear SVM’s decision function is equal to <strong>w</strong><sup>⊺</sup> <strong>x</strong> + <em>b</em> = <em>w</em><sub>1</sub> <em>x</em><sub>1</sub> + ⋯ + <em>w</em><sub><em>n</em></sub> <em>x</em><sub><em>n</em></sub> + <em>b</em>. I will use this convention throughout the rest of this book.</p>
+</div>
+<p>So, making predictions with a linear SVM classifier is quite straightforward. How about training? This requires finding the weights vector <strong>w</strong> and the bias term <em>b</em> that make the street, or margin, as wide as possible while limiting the number of margin violations. Let’s start with the width of the street: to make it larger, we need to make <strong>w</strong> smaller. This may be easier to visualize in 2D, as shown in <a data-type="xref" href="#small_w_large_margin_plot">Figure 5-12</a>. Let’s define the borders of the street as the points where the decision function is equal to –1 or +1. In the left plot the weight <em>w<sub>1</sub></em> is 1, so the points at which <em>w</em><sub>1</sub> <em>x</em><sub>1</sub> = –1 or +1 are <em>x</em><sub>1</sub> = –1 and +1: therefore the margin’s size is 2. In the right plot the weight is 0.5, so the points at which <em>w</em><sub>1</sub> <em>x</em><sub>1</sub> = –1 or +1 are <em>x</em><sub>1</sub> = –2 and +2: the margin’s size is 4. So, we need to keep <strong>w</strong> as small as possible. Note that the bias term <em>b</em> has no influence on the size of the margin: tweaking it just shifts the margin around, without affecting its size.</p>
+<figure><div class="figure" id="small_w_large_margin_plot">
+<img alt="mls3 0512" height="200" src="../Images/mls3_0512.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-12. </span>A smaller weight vector results in a larger margin</h6>
+</div>
+</figure>
+<p>We also want to avoid margin violations, so we need the decision function to be greater than 1 for all positive training instances and lower than –1 for negative training instances. <a data-primary="margin violations" data-type="indexterm" id="idm45983119162400"></a>If we define <em>t</em><sup>(<em>i</em>)</sup> = –1 for negative instances (when <em>y</em><sup>(<em>i</em>)</sup> = 0) and <em>t</em><sup>(<em>i</em>)</sup> = 1 for positive instances (when <em>y</em><sup>(<em>i</em>)</sup> = 1), then we can write this constraint as <em>t</em><sup>(<em>i</em>)</sup>(<strong>w</strong><sup>⊺</sup> <strong>x</strong><sup>(<em>i</em>)</sup> + <em>b</em>) ≥ 1 for all instances.</p>
+<p>We can therefore express the hard margin<a data-primary="classification" data-secondary="hard margin" data-type="indexterm" id="idm45983119152800"></a><a data-primary="constrained optimization" data-type="indexterm" id="idm45983119151824"></a><a data-primary="hard margin classification" data-type="indexterm" id="idm45983119151136"></a> linear SVM classifier objective as the constrained optimization problem in <a data-type="xref" href="#hard_margin_objective">Equation 5-1</a>.</p>
+<div data-type="equation" id="hard_margin_objective"><h5 class="sigil_not_in_toc"><span class="label">Equation 5-1. </span>Hard margin linear SVM classifier objective</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<munder><mo form="prefix">minimize</mo> <mrow><mi mathvariant="bold">w</mi><mo>,</mo><mi>b</mi></mrow></munder>
+<mspace width="1.em"/>
+<mrow>
+<mfrac><mn>1</mn> <mn>2</mn></mfrac>
+<msup><mi mathvariant="bold">w</mi> <mo>⊺</mo> </msup>
+<mi mathvariant="bold">w</mi>
+</mrow>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mtext>subject</mtext>
+<mspace width="4.pt"/>
+<mtext>to</mtext>
+<mspace width="1.em"/>
+<msup><mi>t</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mrow>
+<mo>(</mo>
+<msup><mi mathvariant="bold">w</mi> <mo>⊺</mo> </msup>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>+</mo>
+<mi>b</mi>
+<mo>)</mo>
+</mrow>
+<mo>≥</mo>
+<mn>1</mn>
+<mspace width="1.em"/>
+<mtext>for</mtext>
+<mspace width="4.pt"/>
+<mi>i</mi>
+<mo>=</mo>
+<mn>1</mn>
+<mo>,</mo>
+<mn>2</mn>
+<mo>,</mo>
+<mo>⋯</mo>
+<mo>,</mo>
+<mi>m</mi>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>We are minimizing ½ <strong>w</strong><sup>⊺</sup> <strong>w</strong>, which is equal to ½∥ <strong>w</strong> ∥<sup>2</sup>, rather than minimizing ∥ <strong>w</strong> ∥ (the norm of <strong>w</strong>). Indeed, ½∥ <strong>w</strong> ∥<sup>2</sup> has a nice, simple derivative (it is just <strong>w</strong>), while ∥ <strong>w</strong> ∥ is not differentiable at <strong>w</strong> = 0. Optimization algorithms often work much better on differentiable functions.</p>
+</div>
+<p class="pagebreak-before">To get the soft margin objective, we need to introduce a <em>slack variable</em> <em>ζ</em><sup>(<em>i</em>)</sup> ≥ 0 for each instance:⁠<sup><a data-type="noteref" href="#idm45983119110400" id="idm45983119110400-marker">3</a></sup> <em>ζ</em><sup>(<em>i</em>)</sup> measures how much the <em>i</em><sup>th</sup> instance is allowed to violate the margin. <a data-primary="soft margin classification" data-type="indexterm" id="idm45983119107248"></a><a data-primary="slack variable" data-type="indexterm" id="idm45983119106528"></a>We now have two conflicting objectives: make the slack variables as small as possible to reduce the margin violations, and make ½ <strong>w</strong><sup>⊺</sup> <strong>w</strong> as small as possible to increase the margin. This is where the <code>C</code> hyperparameter comes in: it allows us to define the trade-off between these two objectives. This gives us the constrained optimization problem in <a data-type="xref" href="#soft_margin_objective">Equation 5-2</a>.</p>
+<div data-type="equation" id="soft_margin_objective"><h5 class="sigil_not_in_toc"><span class="label">Equation 5-2. </span>Soft margin linear SVM classifier objective</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<munder><mo form="prefix">minimize</mo> <mrow><mi mathvariant="bold">w</mi><mo>,</mo><mi>b</mi><mo>,</mo><mi>ζ</mi></mrow></munder>
+<mspace width="1.em"/>
+<mrow>
+<mstyle displaystyle="true" scriptlevel="0">
+<mfrac><mn>1</mn> <mn>2</mn></mfrac>
+</mstyle>
+<msup><mi mathvariant="bold">w</mi> <mo>⊺</mo> </msup>
+<mi mathvariant="bold">w</mi>
+<mo>+</mo>
+<mi>C</mi>
+<munderover><mo>∑</mo> <mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </munderover>
+<msup><mi>ζ</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+</mrow>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mtext>subject</mtext>
+<mspace width="4.pt"/>
+<mtext>to</mtext>
+<mspace width="1.em"/>
+<msup><mi>t</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mrow>
+<mo>(</mo>
+<msup><mi mathvariant="bold">w</mi> <mo>⊺</mo> </msup>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>+</mo>
+<mi>b</mi>
+<mo>)</mo>
+</mrow>
+<mo>≥</mo>
+<mn>1</mn>
+<mo>-</mo>
+<msup><mi>ζ</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mspace width="1.em"/>
+<mtext>and</mtext>
+<mspace width="1.em"/>
+<msup><mi>ζ</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>≥</mo>
+<mn>0</mn>
+<mspace width="1.em"/>
+<mtext>for</mtext>
+<mspace width="4.pt"/>
+<mi>i</mi>
+<mo>=</mo>
+<mn>1</mn>
+<mo>,</mo>
+<mn>2</mn>
+<mo>,</mo>
+<mo>⋯</mo>
+<mo>,</mo>
+<mi>m</mi>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>The hard margin and soft margin problems are both convex quadratic optimization problems with linear constraints. <a data-primary="convex quadratic optimization" data-type="indexterm" id="idm45983119059968"></a><a data-primary="quadratic programming (QP) problems" data-type="indexterm" id="idm45983119059296"></a>Such problems are known as <em>quadratic programming</em> (QP) problems. Many off-the-shelf solvers are available to solve QP problems by using a variety of techniques that are outside the scope of this book.⁠<sup><a data-type="noteref" href="#idm45983119058144" id="idm45983119058144-marker">4</a></sup></p>
+<p>Using a QP solver is one way to train an SVM. <a data-primary="squared hinge loss" data-type="indexterm" id="idm45983119055424"></a>Another is to use gradient descent to minimize the <em>hinge loss</em> or the <em>squared hinge loss</em> (see <a data-type="xref" href="#hinge_plot">Figure 5-13</a>). <a data-primary="gradient descent (GD)" data-secondary="minimizing hinge loss" data-type="indexterm" id="idm45983119052432"></a><a data-primary="hinge loss function" data-type="indexterm" id="idm45983119051584"></a>Given an instance <strong>x</strong> of the positive class (i.e., with <em>t</em> = 1), the loss is 0 if the output <em>s</em> of the decision function (<em>s</em> = <strong>w</strong><sup>⊺</sup> <strong>x</strong> + <em>b</em>) is greater than or equal to 1. This happens when the instance is off the street and on the positive side. Given an instance of the negative class (i.e., with <em>t</em> = –1), the loss is 0 if <em>s</em> ≤ –1. This happens when the instance is off the street and on the negative side. The further away an instance is from the correct side of the margin, the higher the loss: it grows linearly for the hinge loss, and quadratically for the squared hinge loss. This makes the squared hinge loss more sensitive to outliers. However, if the dataset is clean, it tends to converge faster. <a data-primary="LinearSVC" data-type="indexterm" id="idm45983119046608"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.linear_model.SGDClassifier" data-type="indexterm" id="idm45983119045904"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.svm.LinearSVC" data-type="indexterm" id="idm45983119044896"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.svm.SVC" data-type="indexterm" id="idm45983119043952"></a><a data-primary="SGDClassifier" data-type="indexterm" id="idm45983119043008"></a><a data-primary="SGDClassifier" data-type="indexterm" id="idm45983119042336"></a>By default, <code>LinearSVC</code> uses the squared hinge loss, while <code>SGDClassifier</code> uses the hinge loss. Both classes let you choose the loss by setting the <code>loss</code> hyperparameter to <code>"hinge"</code> or <code>"squared_hinge"</code>. The <code>SVC</code> class’s optimization algorithm finds a similar solution as minimizing the hinge loss.</p>
+<figure><div class="figure" id="hinge_plot">
+<img alt="mls3 0513" height="222" src="../Images/mls3_0513.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 5-13. </span>The hinge loss (left) and the squared hinge loss (right)</h6>
+</div>
+</figure>
+<p>Next, we’ll look at yet another way to train a linear SVM classifier: solving the dual problem.<a data-primary="" data-startref="ix_decision_func" data-type="indexterm" id="idm45983119036912"></a><a data-primary="" data-startref="ix_svms_decision_func" data-type="indexterm" id="idm45983119035936"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="The Dual Problem" data-type="sect1"><div class="sect1" id="idm45983119241632">
+<h2 id="sigil_toc_id_111">The Dual Problem</h2>
+<p>Given a constrained optimization problem, known as the <em>primal problem</em>, it is possible to express a different but closely related problem, called its <em>dual problem</em>. <a data-primary="support vector machines (SVMs)" data-secondary="dual problem" data-type="indexterm" id="ix_svms_dual_prob"></a><a data-primary="primal problem" data-type="indexterm" id="idm45983119030832"></a><a data-primary="dual problem" data-type="indexterm" id="ix_dual_prob"></a>The <span class="keep-together">solution</span> to the dual problem typically gives a lower bound to the solution of the primal problem, but under some conditions it can have the same solution as the primal problem. Luckily, the SVM problem happens to meet these conditions,⁠<sup><a data-type="noteref" href="#idm45983119028400" id="idm45983119028400-marker">5</a></sup> so you can choose to solve the primal problem or the dual problem; both will have the same solution. <a data-type="xref" href="#svm_dual_form">Equation 5-3</a> shows the dual form of the linear SVM objective. If you are interested in knowing how to derive the dual problem from the primal problem, see the extra material section in <a href="https://homl.info/colab3">this chapter’s notebook</a>.</p>
+<div data-type="equation" id="svm_dual_form"><h5 class="sigil_not_in_toc"><span class="label">Equation 5-3. </span>Dual form of the linear SVM objective</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><munder><mtext>minimize </mtext><mi mathvariant="bold">α</mi></munder><mo> </mo><mfrac><mn>1</mn><mn>2</mn></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>m</mi></munderover><mo> </mo><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>m</mi></munderover><msup><mi>α</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msup><msup><mi>α</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msup><msup><mi>t</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msup><msup><mi>t</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msup><msup><msup><mi mathvariant="bold">x</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msup><mo>⊺</mo></msup><msup><mi mathvariant="bold">x</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msup><mo>  </mo><mo>-</mo><mo>  </mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>m</mi></munderover><msup><mi>α</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msup><mspace linebreak="newline"/><mtext>subject to </mtext><msup><mi>α</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msup><mo>≥</mo><mn>0</mn><mtext> for all </mtext><mi>i</mi><mo>=</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mo>…</mo><mo>,</mo><mi>m</mi><mtext> and </mtext><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>m</mi></munderover><msup><mi>α</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msup><msup><mi>t</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msup><mo>=</mo><mn>0</mn></math>
+</div>
+<p>Once you find the vector 
+<math xmlns="http://www.w3.org/1998/Math/MathML">
+<mover accent="true"><mi mathvariant="bold">α</mi> <mo>^</mo></mover>
+</math> that minimizes this equation (using a QP solver), use <a data-type="xref" href="#from_alpha_to_w_and_b">Equation 5-4</a> to compute the <math xmlns="http://www.w3.org/1998/Math/MathML">
+<mover accent="true"><mi mathvariant="bold">w</mi> <mo>^</mo></mover>
+</math> and <math xmlns="http://www.w3.org/1998/Math/MathML"><mover accent="true"><mi>b</mi><mo>^</mo></mover></math> that minimize the primal problem. In this equation, <em>n</em><sub><em>s</em></sub> represents the number of support vectors.</p>
+<div class="fifty-percent" data-type="equation" id="from_alpha_to_w_and_b"><h5 class="sigil_not_in_toc"><span class="label">Equation 5-4. </span>From the dual solution to the primal solution</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mover accent="true"><mi mathvariant="bold">w</mi> <mo>^</mo></mover>
+<mo>=</mo>
+<munderover><mo>∑</mo> <mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </munderover>
+<msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<msup><mi>t</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mover accent="true"><mi>b</mi> <mo>^</mo></mover>
+<mo>=</mo>
+<mstyle displaystyle="true" scriptlevel="0">
+<mfrac><mn>1</mn> <msub><mi>n</mi> <mi>s</mi> </msub></mfrac>
+</mstyle>
+<munderover><mo>∑</mo> <mfrac linethickness="0pt"><mstyle displaystyle="false" scriptlevel="1"><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow></mstyle> <mstyle displaystyle="false" scriptlevel="1"><mrow><msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><mo>&gt;</mo><mn>0</mn></mrow></mstyle></mfrac> <mi>m</mi> </munderover>
+<mfenced close=")" open="(" separators="">
+<msup><mi>t</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>-</mo>
+<mrow>
+<msup><mrow><mover accent="true"><mi mathvariant="bold">w</mi> <mo>^</mo></mover></mrow> <mo>⊺</mo> </msup>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+</mrow>
+</mfenced>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>The dual problem is faster to solve than the primal one when the number of training instances is smaller than the number of features. More importantly, the dual problem makes the kernel trick possible, while the primal problem does not. So what is this kernel trick, anyway?</p>
+<section data-pdf-bookmark="Kernelized SVMs" data-type="sect2"><div class="sect2" id="idm45983118945728">
+<h2 id="sigil_toc_id_112" class="sigil_not_in_toc">Kernelized SVMs</h2>
+<p>Suppose you want to apply a second-degree polynomial transformation to a two-dimensional training set (such as the moons training set), then train a linear SVM classifier on the transformed training set. <a data-type="xref" href="#example_second_degree_polynomial_mapping">Equation 5-5</a> shows the second-degree polynomial mapping function <em>ϕ</em> that you want to apply.<a data-primary="polynomial kernel" data-type="indexterm" id="idm45983118942720"></a><a data-primary="kernelized SVMs" data-type="indexterm" id="ix_kernel_SVMs"></a><a data-primary="kernel trick" data-type="indexterm" id="ix_kernel_trick2"></a><a data-primary="support vector machines (SVMs)" data-secondary="kernelized SVMs" data-type="indexterm" id="ix_svms_kernelized"></a></p>
+<div class="fifty-percent" data-type="equation" id="example_second_degree_polynomial_mapping"><h5 class="sigil_not_in_toc"><span class="label">Equation 5-5. </span>Second-degree polynomial mapping</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mrow>
+<mi>ϕ</mi>
+<mfenced close=")" open="(">
+<mi mathvariant="bold">x</mi>
+</mfenced>
+<mo>=</mo>
+<mi>ϕ</mi>
+<mfenced close=")" open="(">
+<mfenced close=")" open="(">
+<mtable>
+<mtr>
+<mtd>
+<msub><mi>x</mi> <mn>1</mn> </msub>
+</mtd>
+</mtr>
+<mtr>
+<mtd>
+<msub><mi>x</mi> <mn>2</mn> </msub>
+</mtd>
+</mtr>
+</mtable>
+</mfenced>
+</mfenced>
+<mo>=</mo>
+<mfenced close=")" open="(">
+<mtable>
+<mtr>
+<mtd>
+<msup><mrow><msub><mi>x</mi> <mn>1</mn> </msub></mrow> <mn>2</mn> </msup>
+</mtd>
+</mtr>
+<mtr>
+<mtd>
+<mrow>
+<msqrt>
+<mn>2</mn>
+</msqrt>
+<mspace width="0.166667em"/>
+<msub><mi>x</mi> <mn>1</mn> </msub>
+<msub><mi>x</mi> <mn>2</mn> </msub>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd>
+<msup><mrow><msub><mi>x</mi> <mn>2</mn> </msub></mrow> <mn>2</mn> </msup>
+</mtd>
+</mtr>
+</mtable>
+</mfenced>
+</mrow>
+</math>
+</div>
+<p>Notice that the transformed vector is 3D instead of 2D. Now let’s look at what happens to a couple of 2D vectors, <strong>a</strong> and <strong>b</strong>, if we apply this second-degree polynomial mapping and then compute the dot product⁠<sup><a data-type="noteref" href="#idm45983118912480" id="idm45983118912480-marker">6</a></sup> of the transformed vectors (see <a data-type="xref" href="#kernel_trick_for_second_degree_polynomial_mapping">Equation 5-6</a>).</p>
+<div class="less_space pagebreak-before" data-type="equation" id="kernel_trick_for_second_degree_polynomial_mapping"><h5 class="less_space sigil_not_in_toc"><span class="label">Equation 5-6. </span>Kernel trick for a second-degree polynomial mapping</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd columnalign="right">
+<mrow>
+<mi>ϕ</mi>
+<msup><mrow><mo>(</mo><mi mathvariant="bold">a</mi><mo>)</mo></mrow> <mo>⊺</mo> </msup>
+<mi>ϕ</mi>
+<mrow>
+<mo>(</mo>
+<mi mathvariant="bold">b</mi>
+<mo>)</mo>
+</mrow>
+</mrow>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mspace width="1.em"/>
+<mo>=</mo>
+<msup><mfenced close=")" open="("><mtable><mtr><mtd><msup><mrow><msub><mi>a</mi> <mn>1</mn> </msub></mrow> <mn>2</mn> </msup></mtd></mtr><mtr><mtd><mrow><msqrt><mn>2</mn></msqrt><mspace width="0.166667em"/><msub><mi>a</mi> <mn>1</mn> </msub><msub><mi>a</mi> <mn>2</mn> </msub></mrow></mtd></mtr><mtr><mtd><msup><mrow><msub><mi>a</mi> <mn>2</mn> </msub></mrow> <mn>2</mn> </msup></mtd></mtr></mtable></mfenced> <mo>⊺</mo> </msup>
+<mfenced close=")" open="(">
+<mtable>
+<mtr>
+<mtd>
+<msup><mrow><msub><mi>b</mi> <mn>1</mn> </msub></mrow> <mn>2</mn> </msup>
+</mtd>
+</mtr>
+<mtr>
+<mtd>
+<mrow>
+<msqrt>
+<mn>2</mn>
+</msqrt>
+<mspace width="0.166667em"/>
+<msub><mi>b</mi> <mn>1</mn> </msub>
+<msub><mi>b</mi> <mn>2</mn> </msub>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd>
+<msup><mrow><msub><mi>b</mi> <mn>2</mn> </msub></mrow> <mn>2</mn> </msup>
+</mtd>
+</mtr>
+</mtable>
+</mfenced>
+<mo>=</mo>
+<msup><mrow><msub><mi>a</mi> <mn>1</mn> </msub></mrow> <mn>2</mn> </msup>
+<msup><mrow><msub><mi>b</mi> <mn>1</mn> </msub></mrow> <mn>2</mn> </msup>
+<mo>+</mo>
+<mn>2</mn>
+<msub><mi>a</mi> <mn>1</mn> </msub>
+<msub><mi>b</mi> <mn>1</mn> </msub>
+<msub><mi>a</mi> <mn>2</mn> </msub>
+<msub><mi>b</mi> <mn>2</mn> </msub>
+<mo>+</mo>
+<msup><mrow><msub><mi>a</mi> <mn>2</mn> </msub></mrow> <mn>2</mn> </msup>
+<msup><mrow><msub><mi>b</mi> <mn>2</mn> </msub></mrow> <mn>2</mn> </msup>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mspace width="1.em"/>
+<mo>=</mo>
+<msup><mfenced close=")" open="(" separators=""><msub><mi>a</mi> <mn>1</mn> </msub><msub><mi>b</mi> <mn>1</mn> </msub><mo>+</mo><msub><mi>a</mi> <mn>2</mn> </msub><msub><mi>b</mi> <mn>2</mn> </msub></mfenced> <mn>2</mn> </msup>
+<mo>=</mo>
+<msup><mfenced close=")" open="(" separators=""><msup><mfenced close=")" open="("><mtable><mtr><mtd><msub><mi>a</mi> <mn>1</mn> </msub></mtd></mtr><mtr><mtd><msub><mi>a</mi> <mn>2</mn> </msub></mtd></mtr></mtable></mfenced> <mo>⊺</mo> </msup><mfenced close=")" open="("><mtable><mtr><mtd><msub><mi>b</mi> <mn>1</mn> </msub></mtd></mtr><mtr><mtd><msub><mi>b</mi> <mn>2</mn> </msub></mtd></mtr></mtable></mfenced></mfenced> <mn>2</mn> </msup>
+<mo>=</mo>
+<msup><mrow><mo>(</mo><msup><mi mathvariant="bold">a</mi> <mo>⊺</mo> </msup><mi mathvariant="bold">b</mi><mo>)</mo></mrow> <mn>2</mn> </msup>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>How about that? The dot product of the transformed vectors is equal to the square of the dot product of the original vectors: <em>ϕ</em>(<strong>a</strong>)<sup>⊺</sup> <em>ϕ</em>(<strong>b</strong>) = (<strong>a</strong><sup>⊺</sup> <strong>b</strong>)<sup>2</sup>.</p>
+<p>Here is the key insight: if you apply the transformation <em>ϕ</em> to all training instances, then the dual problem (see <a data-type="xref" href="#svm_dual_form">Equation 5-3</a>) will contain the dot product <em>ϕ</em>(<strong>x</strong><sup>(<em>i</em>)</sup>)<sup>⊺</sup> <em>ϕ</em>(<strong>x</strong><sup>(<em>j</em>)</sup>). But if <em>ϕ</em> is the second-degree polynomial transformation defined in <a data-type="xref" href="#example_second_degree_polynomial_mapping">Equation 5-5</a>, then you can replace this dot product of transformed vectors simply by <math xmlns="http://www.w3.org/1998/Math/MathML">
+<msup><mrow><mo>(</mo><msup><mrow><msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup></mrow> <mo>⊺</mo> </msup><msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup><mo>)</mo></mrow> <mn>2</mn> </msup>
+</math>. So, you don’t need to transform the training instances at all; just replace the dot product by its square in <a data-type="xref" href="#svm_dual_form">Equation 5-3</a>. The result will be strictly the same as if you had gone through the trouble of transforming the training set and then fitting a linear SVM algorithm, but this trick makes the whole process much more computationally efficient.</p>
+<p>The function <em>K</em>(<strong>a</strong>, <strong>b</strong>) = (<strong>a</strong><sup>⊺</sup> <strong>b</strong>)<sup>2</sup> is a second-degree polynomial kernel. In machine learning, a <em>kernel</em> is a function capable of computing the dot product <em>ϕ</em>(<strong>a</strong>)<sup>⊺</sup> <em>ϕ</em>(<strong>b</strong>), based only on the original vectors <strong>a</strong> and <strong>b</strong>, without having to compute (or even to know about) the transformation <em>ϕ</em>. <a data-type="xref" href="#common_kernels">Equation 5-7</a> lists some of the most commonly used kernels.</p>
+<div data-type="equation" id="common_kernels"><h5 class="sigil_not_in_toc"><span class="label">Equation 5-7. </span>Common kernels</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd columnalign="right">
+<mtext>Linear:</mtext>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mspace width="1.em"/>
+<mi>K</mi>
+<mrow>
+<mo>(</mo>
+<mi mathvariant="bold">a</mi>
+<mo>,</mo>
+<mi mathvariant="bold">b</mi>
+<mo>)</mo>
+</mrow>
+<mo>=</mo>
+<msup><mi mathvariant="bold">a</mi> <mo>⊺</mo> </msup>
+<mi mathvariant="bold">b</mi>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<mtext>Polynomial:</mtext>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mspace width="1.em"/>
+<mi>K</mi>
+<mrow>
+<mo>(</mo>
+<mi mathvariant="bold">a</mi>
+<mo>,</mo>
+<mi mathvariant="bold">b</mi>
+<mo>)</mo>
+</mrow>
+<mo>=</mo>
+<msup><mfenced close=")" open="(" separators=""><mi>γ</mi><msup><mi mathvariant="bold">a</mi> <mo>⊺</mo> </msup><mi mathvariant="bold">b</mi><mo>+</mo><mi>r</mi></mfenced> <mi>d</mi> </msup>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<mrow>
+<mtext>Gaussian</mtext>
+<mspace width="4.pt"/>
+<mtext>RBF:</mtext>
+</mrow>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mspace width="1.em"/>
+<mi>K</mi>
+<mrow>
+<mo>(</mo>
+<mi mathvariant="bold">a</mi>
+<mo>,</mo>
+<mi mathvariant="bold">b</mi>
+<mo>)</mo>
+</mrow>
+<mo>=</mo>
+<mo form="prefix">exp</mo>
+<mrow>
+<mo>(</mo>
+<mstyle displaystyle="true" scriptlevel="0">
+<mrow>
+<mo>-</mo>
+<mi>γ</mi>
+<msup><mfenced close="∥" open="∥" separators=""><mi mathvariant="bold">a</mi><mo>-</mo><mi mathvariant="bold">b</mi></mfenced> <mn>2</mn> </msup>
+</mrow>
+</mstyle>
+<mo>)</mo>
+</mrow>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<mtext>Sigmoid:</mtext>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mspace width="1.em"/>
+<mi>K</mi>
+<mrow>
+<mo>(</mo>
+<mi mathvariant="bold">a</mi>
+<mo>,</mo>
+<mi mathvariant="bold">b</mi>
+<mo>)</mo>
+</mrow>
+<mo>=</mo>
+<mo form="prefix">tanh</mo>
+<mfenced close=")" open="(" separators="">
+<mi>γ</mi>
+<msup><mi mathvariant="bold">a</mi> <mo>⊺</mo> </msup>
+<mi mathvariant="bold">b</mi>
+<mo>+</mo>
+<mi>r</mi>
+</mfenced>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<aside class="less_space pagebreak-before" data-type="sidebar" epub:type="sidebar"><div class="sidebar" id="idm45983118752544">
+<h5 class="sigil_not_in_toc">Mercer’s Theorem</h5>
+<p>According to <em>Mercer’s theorem</em>, if a function <em>K</em>(<strong>a</strong>, <strong>b</strong>) respects a few mathematical conditions called <em>Mercer’s conditions</em> (e.g., <em>K</em> must be continuous and symmetric in its arguments so that <em>K</em>(<strong>a</strong>, <strong>b</strong>) = <em>K</em>(<strong>b</strong>, <strong>a</strong>), etc.), then there exists a function <em>ϕ</em> that maps <strong>a</strong> and <strong>b</strong> into another space (possibly with much higher dimensions) such that <em>K</em>(<strong>a</strong>, <strong>b</strong>) = <em>ϕ</em>(<strong>a</strong>)<sup>⊺</sup> <em>ϕ</em>(<strong>b</strong>). You can use <em>K</em> as a kernel because you know <em>ϕ</em> exists, even if you don’t know what <em>ϕ</em> is. <a data-primary="Mercer's theorem" data-type="indexterm" id="idm45983118738592"></a><a data-primary="Gaussian RBF kernel" data-type="indexterm" id="idm45983118737856"></a>In the case of the Gaussian RBF kernel, it can be shown that <em>ϕ</em> maps each training instance to an infinite-dimensional space, so it’s a good thing you don’t need to actually perform the mapping!</p>
+<p>Note that some frequently used kernels (such as the sigmoid kernel) don’t respect all of Mercer’s conditions, yet they generally work well in practice.</p>
+</div>
+</aside>
+<p>There is still one loose end we must tie up. <a data-type="xref" href="#from_alpha_to_w_and_b">Equation 5-4</a> shows how to go from the dual solution to the primal solution in the case of a linear SVM classifier. But if you apply the kernel trick, you end up with equations that include <em>ϕ</em>(<em>x</em><sup>(<em>i</em>)</sup>). In fact, <math xmlns="http://www.w3.org/1998/Math/MathML">
+<mover accent="true"><mi mathvariant="bold">w</mi> <mo>^</mo></mover>
+</math> must have the same number of dimensions as <em>ϕ</em>(<em>x</em><sup>(<em>i</em>)</sup>), which may be huge or even infinite, so you can’t compute it. But how can you make predictions without knowing <math xmlns="http://www.w3.org/1998/Math/MathML">
+<mover accent="true"><mi mathvariant="bold">w</mi> <mo>^</mo></mover>
+</math>? Well, the good news is that you can plug the formula for <math xmlns="http://www.w3.org/1998/Math/MathML">
+<mover accent="true"><mi mathvariant="bold">w</mi> <mo>^</mo></mover>
+</math> from <a data-type="xref" href="#from_alpha_to_w_and_b">Equation 5-4</a> into the decision function for a new instance <strong>x</strong><sup>(<em>n</em>)</sup>, and you get an equation with only dot products between input vectors. This makes it possible to use the kernel trick (<a data-type="xref" href="#making_predictions_with_a_kernelized_svm">Equation 5-8</a>).</p>
+<div data-type="equation" id="making_predictions_with_a_kernelized_svm"><h5 class="sigil_not_in_toc"><span class="label">Equation 5-8. </span>Making predictions with a kernelized SVM</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd columnalign="right">
+<mrow>
+<msub><mi>h</mi> <mrow><mover accent="true"><mi mathvariant="bold">w</mi> <mo>^</mo></mover><mo>,</mo><mover accent="true"><mi>b</mi> <mo>^</mo></mover></mrow> </msub>
+<mfenced close=")" open="(" separators="">
+<mi>ϕ</mi>
+<mo>(</mo>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>n</mi><mo>)</mo></mrow> </msup>
+<mo>)</mo>
+</mfenced>
+</mrow>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mspace width="0.166667em"/>
+<msup><mover accent="true"><mi mathvariant="bold">w</mi> <mo>^</mo></mover> <mo>⊺</mo> </msup>
+<mi>ϕ</mi>
+<mrow>
+<mo>(</mo>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>n</mi><mo>)</mo></mrow> </msup>
+<mo>)</mo>
+</mrow>
+<mo>+</mo>
+<mover accent="true"><mi>b</mi> <mo>^</mo></mover>
+<mo>=</mo>
+<msup><mfenced close=")" open="(" separators=""><munderover><mo>∑</mo> <mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </munderover><msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><msup><mi>t</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><mi>ϕ</mi><mrow><mo>(</mo><msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><mo>)</mo></mrow></mfenced> <mo>⊺</mo> </msup>
+<mi>ϕ</mi>
+<mrow>
+<mo>(</mo>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>n</mi><mo>)</mo></mrow> </msup>
+<mo>)</mo>
+</mrow>
+<mo>+</mo>
+<mover accent="true"><mi>b</mi> <mo>^</mo></mover>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mspace width="0.166667em"/>
+<munderover><mo>∑</mo> <mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </munderover>
+<msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<msup><mi>t</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mfenced close=")" open="(" separators="">
+<mi>ϕ</mi>
+<msup><mrow><mo>(</mo><msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><mo>)</mo></mrow> <mo>⊺</mo> </msup>
+<mi>ϕ</mi>
+<mrow>
+<mo>(</mo>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>n</mi><mo>)</mo></mrow> </msup>
+<mo>)</mo>
+</mrow>
+</mfenced>
+<mo>+</mo>
+<mover accent="true"><mi>b</mi> <mo>^</mo></mover>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<munderover><mo>∑</mo> <mfrac linethickness="0pt"><mstyle displaystyle="false" scriptlevel="1"><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow></mstyle> <mstyle displaystyle="false" scriptlevel="1"><mrow><msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><mo>&gt;</mo><mn>0</mn></mrow></mstyle></mfrac> <mi>m</mi> </munderover>
+<msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<msup><mi>t</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mi>K</mi>
+<mrow>
+<mo>(</mo>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>,</mo>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>n</mi><mo>)</mo></mrow> </msup>
+<mo>)</mo>
+</mrow>
+<mo>+</mo>
+<mover accent="true"><mi>b</mi> <mo>^</mo></mover>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>Note that since <em>α</em><sup>(<em>i</em>)</sup> ≠ 0 only for support vectors, making predictions involves computing the dot product of the new input vector <strong>x</strong><sup>(<em>n</em>)</sup> with only the support vectors, not all the training instances. Of course, you need to use the same trick to compute the bias term <math xmlns="http://www.w3.org/1998/Math/MathML"><mover><mi>b</mi><mo>^</mo></mover></math> (<a data-type="xref" href="#bias_term_using_the_kernel_trick">Equation 5-9</a>).</p>
+<div class="less_space pagebreak-before" data-type="equation" id="bias_term_using_the_kernel_trick"><h5 class="less_space sigil_not_in_toc"><span class="label">Equation 5-9. </span>Using the kernel trick to compute the bias term</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd columnalign="right">
+<mover accent="true"><mi>b</mi> <mo>^</mo></mover>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mstyle displaystyle="true" scriptlevel="0">
+<mfrac><mn>1</mn> <msub><mi>n</mi> <mi>s</mi> </msub></mfrac>
+</mstyle>
+<munderover><mo>∑</mo> <mfrac linethickness="0pt"><mstyle displaystyle="false" scriptlevel="1"><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow></mstyle> <mstyle displaystyle="false" scriptlevel="1"><mrow><msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><mo>&gt;</mo><mn>0</mn></mrow></mstyle></mfrac> <mi>m</mi> </munderover>
+<mfenced close=")" open="(" separators="">
+<msup><mi>t</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>-</mo>
+<msup><mrow><mover accent="true"><mi mathvariant="bold">w</mi> <mo>^</mo></mover></mrow> <mo>⊺</mo> </msup>
+<mi>ϕ</mi>
+<mrow>
+<mo>(</mo>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>)</mo>
+</mrow>
+</mfenced>
+<mo>=</mo>
+<mstyle displaystyle="true" scriptlevel="0">
+<mfrac><mn>1</mn> <msub><mi>n</mi> <mi>s</mi> </msub></mfrac>
+</mstyle>
+<munderover><mo>∑</mo> <mfrac linethickness="0pt"><mstyle displaystyle="false" scriptlevel="1"><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow></mstyle> <mstyle displaystyle="false" scriptlevel="1"><mrow><msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><mo>&gt;</mo><mn>0</mn></mrow></mstyle></mfrac> <mi>m</mi> </munderover>
+<mfenced close=")" open="(" separators="">
+<msup><mi>t</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>-</mo>
+<msup><mrow><mfenced close=")" open="(" separators=""><munderover><mo>∑</mo> <mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </munderover><msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup><msup><mi>t</mi> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup><mi>ϕ</mi><mrow><mo>(</mo><msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup><mo>)</mo></mrow></mfenced></mrow> <mo>⊺</mo> </msup>
+<mi>ϕ</mi>
+<mrow>
+<mo>(</mo>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>)</mo>
+</mrow>
+</mfenced>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mstyle displaystyle="true" scriptlevel="0">
+<mfrac><mn>1</mn> <msub><mi>n</mi> <mi>s</mi> </msub></mfrac>
+</mstyle>
+<munderover><mo>∑</mo> <mfrac linethickness="0pt"><mstyle displaystyle="false" scriptlevel="1"><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow></mstyle> <mstyle displaystyle="false" scriptlevel="1"><mrow><msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><mo>&gt;</mo><mn>0</mn></mrow></mstyle></mfrac> <mi>m</mi> </munderover>
+<mfenced close=")" open="(" separators="">
+<msup><mi>t</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>-</mo>
+<munderover><mo>∑</mo> <mfrac linethickness="0pt"><mstyle displaystyle="false" scriptlevel="1"><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow></mstyle> <mstyle displaystyle="false" scriptlevel="1"><mrow><msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup><mo>&gt;</mo><mn>0</mn></mrow></mstyle></mfrac> <mi>m</mi> </munderover>
+<mrow>
+<msup><mrow><mover accent="true"><mi>α</mi> <mo>^</mo></mover></mrow> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup>
+<msup><mi>t</mi> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup>
+<mi>K</mi>
+<mrow>
+<mo>(</mo>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+<mo>,</mo>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup>
+<mo>)</mo>
+</mrow>
+</mrow>
+</mfenced>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>If you are starting to get a headache, that’s perfectly normal: it’s an unfortunate side effect of the kernel trick.</p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p><a data-primary="online kernelized SVMs" data-type="indexterm" id="idm45983118537008"></a>It is also possible to implement online kernelized SVMs, capable of incremental learning, as described in the papers <a href="https://homl.info/17">“Incremental and Decremental Support Vector Machine Learning”</a>⁠<sup><a data-type="noteref" href="#idm45983118535056" id="idm45983118535056-marker">7</a></sup> and <a href="https://homl.info/18">“Fast Kernel Classifiers with Online and Active Learning”</a>.⁠<sup><a data-type="noteref" href="#idm45983118532944" id="idm45983118532944-marker">8</a></sup> These kernelized SVMs are implemented in Matlab and C++. But for large-scale nonlinear problems, you may want to consider using random forests (see <a data-type="xref" href="HOMLWSKT011.xhtml#ensembles_chapter">Chapter 7</a>) or neural networks (see <a data-type="xref" href="HOMLWSKT014.xhtml#neural_nets_part">Part II</a>).<a data-primary="" data-startref="ix_svms_ch5" data-type="indexterm" id="idm45983118530000"></a><a data-primary="" data-startref="ix_linear_svm_class2" data-type="indexterm" id="idm45983118529024"></a><a data-primary="" data-startref="ix_svms_mechanics" data-type="indexterm" id="idm45983118528080"></a><a data-primary="" data-startref="ix_dual_prob" data-type="indexterm" id="idm45983118527136"></a><a data-primary="" data-startref="ix_svms_dual_prob" data-type="indexterm" id="idm45983118526192"></a><a data-primary="" data-startref="ix_kernel_SVMs" data-type="indexterm" id="idm45983118525248"></a><a data-primary="" data-startref="ix_kernel_trick2" data-type="indexterm" id="idm45983118524304"></a><a data-primary="" data-startref="ix_svms_kernelized" data-type="indexterm" id="idm45983118523360"></a></p>
+</div>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Exercises" data-type="sect1"><div class="sect1" id="idm45983118945072">
+<h2 id="sigil_toc_id_113">Exercises</h2>
+<ol>
+<li>
+<p>What is the fundamental idea behind support vector machines?</p>
+</li>
+<li>
+<p>What is a support vector?</p>
+</li>
+<li>
+<p>Why is it important to scale the inputs when using SVMs?</p>
+</li>
+<li>
+<p>Can an SVM classifier output a confidence score when it classifies an instance? What about a probability?</p>
+</li>
+<li>
+<p>How can you choose between <code>LinearSVC</code>, <code>SVC</code>, and <code>SGDClassifier</code>?</p>
+</li>
+<li>
+<p>Say you’ve trained an SVM classifier with an RBF kernel, but it seems to underfit the training set. Should you increase or decrease <em>γ</em> (<code>gamma</code>)? What about <code>C</code>?</p>
+</li>
+<li>
+<p>What does it mean for a model to be <em>ϵ-insensitive</em>?</p>
+</li>
+<li>
+<p>What is the point of using the kernel trick?</p>
+</li>
+<li>
+<p>Train a <code>LinearSVC</code> on a linearly separable dataset. Then train an <code>SVC</code> and a <code>SGDClassifier</code> on the same dataset. See if you can get them to produce roughly the same model.</p>
+</li>
+<li>
+<p>Train an SVM classifier on the wine dataset, which you can load using <code>sklearn.datasets.load_wine()</code>. This dataset contains the chemical analyses of 178 wine samples produced by 3 different cultivators: the goal is to train a classification model capable of predicting the cultivator based on the wine’s chemical analysis. Since SVM classifiers are binary classifiers, you will need to use one-versus-all to classify all three classes. What accuracy can you reach?</p>
+</li>
+<li>
+<p>Train and fine-tune an SVM regressor on the California housing dataset. You can use the original dataset rather than the tweaked version we used in <a data-type="xref" href="HOMLWSKT006.xhtml#project_chapter">Chapter 2</a>, which you can load using 
+<span class="keep-together"><code>sklearn.datasets.fetch_california_housing()</code>.</span> The targets represent hundreds of thousands of dollars. Since there are over 20,000 instances, SVMs can be slow, so for hyperparameter tuning you should use far fewer instances (e.g., 2,000) to test many more hyperparameter combinations. What is your best model’s RMSE?</p>
+</li>
+</ol>
+<p>Solutions to these exercises are available at the end of this chapter’s notebook, at <a href="https://homl.info/colab3"><em class="hyperlink">https://homl.info/colab3</em></a>.</p>
+</div>
+</section>
+<div data-type="footnotes"><p data-type="footnote" id="idm45983119431792"><sup><a href="#idm45983119431792-marker">1</a></sup> Chih-Jen Lin et al., “A Dual Coordinate Descent Method for Large-Scale Linear SVM”, <em>Proceedings of the 25th International Conference on Machine Learning</em> (2008): 408–415.</p>
+<p data-type="footnote" id="idm45983119419280"><sup><a href="#idm45983119419280-marker">2</a></sup> John Platt, “Sequential Minimal Optimization: A Fast Algorithm for Training Support Vector Machines” (Microsoft Research technical report, April 21, 1998).</p>
+<p data-type="footnote" id="idm45983119110400"><sup><a href="#idm45983119110400-marker">3</a></sup> Zeta (<em>ζ</em>) is the sixth letter of the Greek alphabet.</p>
+<p data-type="footnote" id="idm45983119058144"><sup><a href="#idm45983119058144-marker">4</a></sup> To learn more about quadratic programming, you can start by reading Stephen Boyd and Lieven Vandenberghe’s book <a href="https://homl.info/15"><em>Convex Optimization</em></a> (Cambridge University Press) or watching Richard Brown’s <a href="https://homl.info/16">series of video lectures</a>.</p>
+<p data-type="footnote" id="idm45983119028400"><sup><a href="#idm45983119028400-marker">5</a></sup> The objective function is convex, and the inequality constraints are continuously differentiable and convex functions.</p>
+<p data-type="footnote" id="idm45983118912480"><sup><a href="#idm45983118912480-marker">6</a></sup> As explained in <a data-type="xref" href="HOMLWSKT008.xhtml#linear_models_chapter">Chapter 4</a>, the dot product of two vectors <strong>a</strong> and <strong>b</strong> is normally noted <strong>a</strong> · <strong>b</strong>. However, in machine learning, vectors are frequently represented as column vectors (i.e., single-column matrices), so the dot product is achieved by computing <strong>a</strong><sup>⊺</sup><strong>b</strong>. To remain consistent with the rest of the book, we will use this notation here, ignoring the fact that this technically results in a single-cell matrix rather than a scalar value.</p>
+<p data-type="footnote" id="idm45983118535056"><sup><a href="#idm45983118535056-marker">7</a></sup> Gert Cauwenberghs and Tomaso Poggio, “Incremental and Decremental Support Vector Machine Learning”, <em>Proceedings of the 13th International Conference on Neural Information Processing Systems</em> (2000): 388–394.</p>
+<p data-type="footnote" id="idm45983118532944"><sup><a href="#idm45983118532944-marker">8</a></sup> Antoine Bordes et al., “Fast Kernel Classifiers with Online and Active Learning”, <em>Journal of Machine Learning Research</em> 6 (2005): 1579–1619.</p>
+</div>
+</div>
+</section>
+</div>
+</body>
+</html>

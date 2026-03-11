@@ -1,0 +1,785 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+<title>1. The Machine Learning Landscape</title>
+<link href="../Styles/epub.css" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+<div id="sbo-rt-content"><section data-pdf-bookmark="Chapter 1. The Machine Learning Landscape" data-type="chapter" epub:type="chapter"><div class="chapter" id="landscape_chapter">
+<h1><span class="label">Chapter 1. </span>The Machine Learning Landscape</h1>
+<p>Not so long ago, if you had picked up your phone and asked it the way home, it would have ignored you—and people would have questioned your sanity. But machine learning is no longer science fiction: billions of people use it every day. <a data-primary="rectified linear units (ReLU)" data-see="ReLU" data-type="indexterm" id="idm45983151894656"></a><a data-primary="Google Vertex AI" data-see="Vertex AI" data-type="indexterm" id="idm45983151892912"></a><a data-primary="OCR (optical character recognition)" data-type="indexterm" id="idm45983151891968"></a><a data-primary="optical character recognition (OCR)" data-type="indexterm" id="idm45983151891280"></a>And the truth is it has actually been around for decades in some specialized applications, such as optical character recognition (OCR). <a data-primary="spam filters" data-type="indexterm" id="ix_spam_filter"></a><a data-primary="machine learning (ML)" data-secondary="spam filter example" data-type="indexterm" id="ix_ml_spam_filter"></a>The first ML application that really became mainstream, improving the lives of hundreds of millions of people, took over the world back in the 1990s: the <em>spam filter</em>. It’s not exactly a self-aware robot, but it does technically qualify as machine learning: it has actually learned so well that you seldom need to flag an email as spam anymore. It was followed by hundreds of ML applications that now quietly power hundreds of products and features that you use regularly: voice prompts, automatic translation, image search, product recommendations, and many more.<a data-primary="activation functions" data-secondary="ReLU" data-see="ReLU" data-type="indexterm" id="idm45983151887632"></a><a data-primary="ANNs" data-see="artificial neural networks" data-type="indexterm" id="idm45983158468256"></a><a data-primary="artificial neural networks (ANNs)" data-secondary="autoencoders" data-see="autoencoders" data-type="indexterm" id="idm45983158467296"></a><a data-primary="artificial neural networks (ANNs)" data-secondary="perceptrons" data-see="multilayer perceptrons" data-type="indexterm" id="idm45983158466064"></a><a data-primary="classification" data-secondary="image" data-see="images" data-type="indexterm" id="idm45983158464832"></a><a data-primary="classification" data-secondary="logistic regression" data-see="logistic regression" data-type="indexterm" id="idm45983158463616"></a><a data-primary="classification" data-secondary="SVMs" data-see="support vector machines" data-type="indexterm" id="idm45983158462400"></a><a data-primary="clustering algorithms" data-secondary="k-means" data-see="k-means algorithm" data-type="indexterm" id="idm45983158461184"></a><a data-primary="CNNs" data-see="convolutional neural networks" data-type="indexterm" id="idm45983158459968"></a><a data-primary="data" data-secondary="overfitting" data-see="overfitting of data" data-type="indexterm" id="idm45983158459008"></a><a data-primary="data" data-secondary="preprocessing" data-see="loading and preprocessing data" data-type="indexterm" id="idm45983158457792"></a><a data-primary="data" data-secondary="test data" data-see="test set" data-type="indexterm" id="idm45983158853200"></a><a data-primary="data" data-secondary="time series" data-see="time series data" data-type="indexterm" id="idm45983158851984"></a><a data-primary="data" data-secondary="training data" data-see="training set" data-type="indexterm" id="idm45983158850768"></a><a data-primary="data" data-secondary="visualizing" data-see="visualization" data-type="indexterm" id="idm45983158849552"></a><a data-primary="deep autoencoders" data-see="stacked autoencoders" data-type="indexterm" id="idm45983158848336"></a><a data-primary="deep neural networks (DNNs)" data-secondary="CNNs" data-see="convolutional neural networks" data-type="indexterm" id="idm45983158847392"></a><a data-primary="deep neural networks (DNNs)" data-secondary="MLPs" data-see="multilayer perceptrons" data-type="indexterm" id="idm45983158846144"></a><a data-primary="deep neural networks (DNNs)" data-secondary="RNNs" data-see="recurrent neural networks" data-type="indexterm" id="idm45983158844912"></a><a data-primary="deep Q-networks (DQNs)" data-see="Q-learning algorithm" data-type="indexterm" id="idm45983158843664"></a><a data-primary="dimensionality reduction" data-secondary="PCA" data-see="principal component analysis" data-type="indexterm" id="idm45983158842720"></a><a data-primary="DQNs (deep Q-networks)" data-see="Q-learning algorithm" data-type="indexterm" id="idm45983156515104"></a><a data-primary="ensemble learning" data-secondary="random forests" data-see="random forests" data-type="indexterm" id="idm45983156514160"></a><a data-primary="forecasting time series" data-see="time series data" data-type="indexterm" id="idm45983156512944"></a><a data-primary="game play" data-see="reinforcement learning" data-type="indexterm" id="idm45983156512000"></a><a data-primary="GANs" data-see="generative adversarial networks" data-type="indexterm" id="idm45983156511056"></a><a data-primary="GD" data-see="gradient descent" data-type="indexterm" id="idm45983156510096"></a><a data-primary="GMM" data-see="Gaussian mixture model" data-type="indexterm" id="idm45983156509152"></a><a data-primary="gradients" data-secondary="unstable" data-see="vanishing and exploding gradients" data-type="indexterm" id="idm45983156508208"></a><a data-primary="graphical processing units" data-see="GPU implementation" data-type="indexterm" id="idm45983156506976"></a><a data-primary="hypothesis boosting" data-see="boosting" data-type="indexterm" id="idm45983156506016"></a><a data-primary="IID" data-see="independent and identically distributed" data-type="indexterm" id="idm45983156505072"></a><a data-primary="images, classifying and generating" data-secondary="autoencoders" data-see="autoencoders" data-type="indexterm" id="idm45983156504112"></a><a data-primary="images, classifying and generating" data-secondary="CNNs" data-see="convolutional neural networks" data-type="indexterm" id="idm45983158967392"></a><a data-primary="linear models" data-secondary="linear regression" data-see="linear regression" data-type="indexterm" id="idm45983158966144"></a><a data-primary="linear regression" data-secondary="regularizing models" data-see="regularization" data-type="indexterm" id="idm45983158964928"></a><a data-primary="ML" data-see="machine learning" data-type="indexterm" id="idm45983158963712"></a><a data-primary="MLPs" data-see="multilayer perceptrons" data-type="indexterm" id="idm45983158962768"></a><a data-primary="model server" data-see="TensorFlow Serving" data-type="indexterm" id="idm45983158961824"></a><a data-primary="natural language processing (NLP)" data-secondary="transformer models" data-see="transformer models" data-type="indexterm" id="idm45983158960880"></a><a data-primary="neural networks" data-see="artificial neural networks" data-type="indexterm" id="idm45983158959648"></a><a data-primary="NMT" data-see="neural machine translation" data-type="indexterm" id="idm45983158958688"></a><a data-primary="outlier detection" data-see="anomaly detection" data-type="indexterm" id="idm45983158957728"></a><a data-primary="PCA" data-see="principal component analysis" data-type="indexterm" id="idm45983158956784"></a><a data-primary="preprocessing data" data-see="loading and preprocessing data" data-type="indexterm" id="idm45983158955824"></a><a data-primary="random forests" data-secondary="decision trees" data-see="decision trees" data-type="indexterm" id="idm45983158954864"></a><a data-primary="recurrent neural networks (RNNs)" data-secondary="forecasting time series" data-see="time series data" data-type="indexterm" id="idm45983157578464"></a><a data-primary="recurrent neural networks (RNNs)" data-secondary="NLP" data-see="natural language processing" data-type="indexterm" id="idm45983157577232"></a><a data-primary="regression models" data-secondary="linear regression" data-see="linear regression" data-type="indexterm" id="idm45983157575984"></a><a data-primary="regression models" data-secondary="logistic regression" data-see="logistic regression" data-type="indexterm" id="idm45983157574768"></a><a data-primary="RL" data-see="reinforcement learning" data-type="indexterm" id="idm45983157573552"></a><a data-primary="SGD" data-see="stochastic gradient descent" data-type="indexterm" id="idm45983157572608"></a><a data-primary="SVMs" data-see="support vector machines" data-type="indexterm" id="idm45983157571648"></a><a data-primary="TensorFlow" data-secondary="custom models" data-see="custom models and training algorithms" data-type="indexterm" id="idm45983157570704"></a><a data-primary="TensorFlow" data-secondary="parallelism to train models" data-see="parallelism" data-type="indexterm" id="idm45983157569472"></a><a data-primary="TensorFlow" data-secondary="serving a model" data-see="TensorFlow Serving" data-type="indexterm" id="idm45983157568240"></a><a data-primary="TensorFlow" data-secondary="tf.data API" data-see="tf.data API" data-type="indexterm" id="idm45983157567024"></a><a data-primary="text processing" data-see="natural language processing" data-type="indexterm" id="idm45983157565808"></a><a data-primary="TF Serving" data-see="TensorFlow Serving" data-type="indexterm" id="idm45983158828352"></a><a data-primary="transformation of data" data-secondary="transformer models" data-see="transformer models" data-type="indexterm" id="idm45983158827408"></a><a data-primary="unsupervised learning" data-secondary="autoencoders" data-see="autoencoders" data-type="indexterm" id="idm45983158826192"></a><a data-primary="unsupervised learning" data-secondary="dimensionality reduction" data-see="dimensionality reduction" data-type="indexterm" id="idm45983158824976"></a><a data-primary="unsupervised learning" data-secondary="GANs" data-see="generative adversarial networks" data-type="indexterm" id="idm45983158823728"></a><a data-primary="unsupervised learning" data-secondary="k-means" data-see="k-means algorithm" data-type="indexterm" id="idm45983158822496"></a><a data-primary="unsupervised learning" data-secondary="clustering" data-see="clustering algorithms" data-type="indexterm" id="idm45983158821280"></a></p>
+<p>Where does machine learning start and where does it end? What exactly does it mean for a machine to <em>learn</em> something? If I download a copy of all Wikipedia articles, has my computer really learned something? Is it suddenly smarter? In this chapter I will start by clarifying what machine learning is and why you may want to use it.</p>
+<p>Then, before we set out to explore the machine learning continent, we will take a look at the map and learn about the main regions and the most notable landmarks: supervised versus unsupervised learning and their variants, online versus batch learning, instance-based versus model-based learning. Then we will look at the workflow of a typical ML project, discuss the main challenges you may face, and cover how to evaluate and fine-tune a machine learning system.</p>
+<p>This chapter introduces a lot of fundamental concepts (and jargon) that every data scientist should know by heart. It will be a high-level overview (it’s the only chapter without much code), all rather simple, but my goal is to ensure everything is crystal clear to you before we continue on to the rest of the book. So grab a coffee and let’s get started!</p>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>If you are already familiar with machine learning basics, you may want to skip directly to <a data-type="xref" href="HOMLWSKT006.xhtml#project_chapter">Chapter 2</a>. If you are not sure, try to answer all the questions listed at the end of the chapter before moving on.</p>
+</div>
+<section data-pdf-bookmark="What Is Machine Learning?" data-type="sect1"><div class="sect1" id="what_is_machine_learning">
+<h2 id="sigil_toc_id_15">What Is Machine Learning?</h2>
+<p>Machine learning is the science (and art) of programming computers so they can <em>learn from data</em>.<a data-primary="machine learning (ML)" data-type="indexterm" id="idm45983151805648"></a></p>
+<p>Here is a slightly more general definition:</p>
+<blockquote>
+<p>[Machine learning is the] field of study that gives computers the ability to learn without being explicitly programmed.</p>
+<p data-type="attribution">Arthur Samuel, <cite>1959</cite></p>
+</blockquote>
+<p>And a more engineering-oriented one:</p>
+<blockquote>
+<p>A computer program is said to learn from experience <em>E</em> with respect to some task <em>T</em> and some performance measure <em>P</em>, if its performance on <em>T</em>, as measured by <em>P</em>, improves with experience <em>E</em>.</p>
+<p data-type="attribution">Tom Mitchell, <cite>1997</cite></p>
+</blockquote>
+<p>Your spam filter is a machine learning program that, given examples of spam emails (flagged by users) and examples of regular emails (nonspam, also called “ham”), can learn to flag spam. <a data-primary="training instance" data-type="indexterm" id="idm45983151796752"></a><a data-primary="training set" data-type="indexterm" id="idm45983151796048"></a>The examples that the system uses to learn are called the <em>training set</em>. Each training example is called a <em>training instance</em> (or <em>sample</em>). The part of a machine learning system that learns and makes predictions is called a <em>model</em>. Neural networks and random forests are examples of models.</p>
+<p>In this case, the task <em>T</em> is to flag spam for new emails, the experience <em>E</em> is the <em>training data</em>, and the performance measure <em>P</em> needs to be defined; for example, you can use the ratio of correctly classified emails. <a data-primary="accuracy performance measure" data-type="indexterm" id="idm45983156124480"></a>This particular performance measure is called <em>accuracy</em>, and it is often used in classification tasks.</p>
+<p>If you just download a copy of all Wikipedia articles, your computer has a lot more data, but it is not suddenly better at any task. This is not machine learning.</p>
+</div>
+</section>
+<section class="less_space pagebreak-before" data-pdf-bookmark="Why Use Machine Learning?" data-type="sect1"><div class="sect1" id="idm45983158816208">
+<h2 id="sigil_toc_id_16">Why Use Machine Learning?</h2>
+<p><a data-primary="machine learning (ML)" data-secondary="reasons for using" data-type="indexterm" id="ix_ml_reasons"></a>Consider how you would write a spam filter using traditional programming techniques (<a data-type="xref" href="#traditional_approach_diagram">Figure 1-1</a>):</p>
+<ol>
+<li>
+<p>First you would examine what spam typically looks like. You might notice that some words or phrases (such as “4U”, “credit card”, “free”, and “amazing”) tend to come up a lot in the subject line. Perhaps you would also notice a few other patterns in the sender’s name, the email’s body, and other parts of the email.</p>
+</li>
+<li>
+<p>You would write a detection algorithm for each of the patterns that you noticed, and your program would flag emails as spam if a number of these patterns were detected.</p>
+</li>
+<li>
+<p>You would test your program and repeat steps 1 and 2 until it was good enough to launch.</p>
+</li>
+</ol>
+<figure class="smallerseventy"><div class="figure" id="traditional_approach_diagram">
+<img alt="mls3 0101" height="364" src="../Images/mls3_0101.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-1. </span>The traditional approach</h6>
+</div>
+</figure>
+<p>Since the problem is difficult, your program will likely become a long list of complex rules—pretty hard to maintain.</p>
+<p>In contrast, a spam filter based on machine learning techniques automatically learns which words and phrases are good predictors of spam by detecting unusually frequent patterns of words in the spam examples compared to the ham examples (<a data-type="xref" href="#ml_approach_diagram">Figure 1-2</a>). The program is much shorter, easier to maintain, and most likely more accurate.</p>
+<figure class="smallerseventy"><div class="figure" id="ml_approach_diagram">
+<img alt="mls3 0102" height="364" src="../Images/mls3_0102.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-2. </span>The machine learning approach</h6>
+</div>
+</figure>
+<p>What if spammers notice that all their emails containing “4U” are blocked? They might start writing “For U” instead. A spam filter using traditional programming techniques would need to be updated to flag “For U” emails. If spammers keep working around your spam filter, you will need to keep writing new rules forever.</p>
+<p>In contrast, a spam filter based on machine learning techniques automatically notices that “For U” has become unusually frequent in spam flagged by users, and it starts flagging them without your intervention (<a data-type="xref" href="#adapting_to_change_diagram">Figure 1-3</a>).</p>
+<figure class="smallerseventy"><div class="figure" id="adapting_to_change_diagram">
+<img alt="mls3 0103" height="297" src="../Images/mls3_0103.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-3. </span>Automatically adapting to change</h6>
+</div>
+</figure>
+<p>Another area where machine learning shines is for problems that either are too complex for traditional approaches or have no known algorithm. For example, consider speech recognition. <a data-primary="speech recognition" data-type="indexterm" id="idm45983158765504"></a>Say you want to start simple and write a program capable of distinguishing the words “one” and “two”. You might notice that the word “two” starts with a high-pitch sound (“T”), so you could hardcode an algorithm that measures high-pitch sound intensity and use that to distinguish ones and twos⁠—but obviously this technique will not scale to thousands of words spoken by millions of very different people in noisy environments and in dozens of languages. The best solution (at least today) is to write an algorithm that learns by itself, given many example recordings for each word.</p>
+<p>Finally, machine learning can help humans learn (<a data-type="xref" href="#data_mining_diagram">Figure 1-4</a>). ML models can be inspected to see what they have learned (although for some models this can be tricky). For instance, once a spam filter has been trained on enough spam, it can easily be inspected to reveal the list of words and combinations of words that it believes are the best predictors of spam. Sometimes this will reveal unsuspected <span class="keep-together">correlations</span> or new trends, and thereby lead to a better understanding of the problem. <a data-primary="data mining" data-type="indexterm" id="idm45983158762800"></a>Digging into large amounts of data to discover hidden patterns is called <em>data mining</em>, and machine learning excels at it.</p>
+<figure class="smallerseventyfive"><div class="figure" id="data_mining_diagram">
+<img alt="mls3 0104" height="400" src="../Images/mls3_0104.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-4. </span>Machine learning can help humans learn</h6>
+</div>
+</figure>
+<p>To summarize, machine learning is great for:</p>
+<ul>
+<li>
+<p>Problems for which existing solutions require a lot of fine-tuning or long
+lists of rules (a machine learning model can often simplify code and perform better than the traditional approach)</p>
+</li>
+<li>
+<p>Complex problems for which using a traditional approach yields no good solution (the best
+machine learning techniques can perhaps find a solution)</p>
+</li>
+<li>
+<p>Fluctuating environments (a machine learning system can easily be retrained on new data, always keeping it up to date)<a data-primary="" data-startref="ix_spam_filter" data-type="indexterm" id="idm45983158755472"></a><a data-primary="" data-startref="ix_ml_reasons" data-type="indexterm" id="idm45983156333088"></a><a data-primary="" data-startref="ix_ml_spam_filter" data-type="indexterm" id="idm45983156332144"></a></p>
+</li>
+<li>
+<p>Getting insights about complex problems and large amounts of data</p>
+</li>
+</ul>
+</div>
+</section>
+<section class="less_space pagebreak-before" data-pdf-bookmark="Examples of Applications" data-type="sect1"><div class="sect1" id="idm45983156122480">
+<h2 id="sigil_toc_id_17">Examples of Applications</h2>
+<p>Let’s look at some concrete examples of machine learning tasks, along with the techniques that can tackle them:<a data-primary="classification" data-secondary="application examples of" data-type="indexterm" id="ix_classif_ex"></a><a data-primary="machine learning (ML)" data-secondary="application/technique examples" data-type="indexterm" id="ix_ml_app_ex"></a></p>
+<dl>
+<dt>Analyzing images of products on a production line to automatically classify them</dt>
+<dd>
+<p>This is image classification, typically performed using convolutional neural networks (CNNs; see <a data-type="xref" href="HOMLWSKT019.xhtml#cnn_chapter">Chapter 14</a>) or sometimes transformers (see <a data-type="xref" href="HOMLWSKT021.xhtml#nlp_chapter">Chapter 16</a>).<a data-primary="images, classifying and generating" data-type="indexterm" id="idm45983156321872"></a></p>
+</dd>
+<dt>Detecting tumors in brain scans</dt>
+<dd>
+<p><a data-primary="convolutional neural networks (CNNs)" data-secondary="semantic segmentation" data-type="indexterm" id="idm45983156319984"></a><a data-primary="semantic segmentation" data-type="indexterm" id="idm45983156318944"></a>This is semantic image segmentation, where each pixel in the image is classified (as we want to determine the exact location and shape of tumors), typically using CNNs or transformers.</p>
+</dd>
+<dt>Automatically classifying news articles</dt>
+<dd>
+<p><a data-primary="natural language processing (NLP)" data-secondary="machine learning examples" data-type="indexterm" id="idm45983154062656"></a>This is natural language processing (NLP), and more specifically text classification, which can be tackled using recurrent neural networks (RNNs) and CNNs, but transformers work even better (see <a data-type="xref" href="HOMLWSKT021.xhtml#nlp_chapter">Chapter 16</a>).</p>
+</dd>
+<dt>Automatically flagging offensive comments on discussion forums</dt>
+<dd>
+<p>This is also text classification, using the same NLP tools.</p>
+</dd>
+<dt>Summarizing long documents automatically</dt>
+<dd>
+<p><a data-primary="natural language processing (NLP)" data-secondary="text summarization" data-type="indexterm" id="idm45983154058032"></a>This is a branch of NLP called text summarization, again using the same tools.</p>
+</dd>
+<dt>Creating a chatbot or a personal assistant</dt>
+<dd>
+<p><a data-primary="question-answering modules" data-type="indexterm" id="idm45983154055696"></a><a data-primary="natural language understanding (NLU)" data-type="indexterm" id="idm45983154054976"></a><a data-primary="NLU (natural language understanding)" data-type="indexterm" id="idm45983154054288"></a>This involves many NLP components, including natural language understanding (NLU) and question-answering modules.<a data-primary="chatbot or personal assistant" data-type="indexterm" id="idm45983154053344"></a></p>
+</dd>
+<dt>Forecasting your company’s revenue next year, based on many performance metrics</dt>
+<dd>
+<p><a data-primary="regression models" data-secondary="forecasting example" data-type="indexterm" id="idm45983154051184"></a>This is a regression task (i.e., predicting values) that may be tackled using any regression model, such as a linear regression or polynomial regression model (see <a data-type="xref" href="HOMLWSKT008.xhtml#linear_models_chapter">Chapter 4</a>), a regression support vector machine (see <a data-type="xref" href="HOMLWSKT009.xhtml#svm_chapter">Chapter 5</a>), a regression random forest (see <a data-type="xref" href="HOMLWSKT011.xhtml#ensembles_chapter">Chapter 7</a>), or an artificial neural network (see <a data-type="xref" href="HOMLWSKT015.xhtml#ann_chapter">Chapter 10</a>). If you want to take into account sequences of past performance metrics, you may want to use RNNs, CNNs, or transformers (see Chapters <a data-type="xref" data-xrefstyle="select:labelnumber" href="HOMLWSKT020.xhtml#rnn_chapter">15</a> and <a data-type="xref" data-xrefstyle="select:labelnumber" href="HOMLWSKT021.xhtml#nlp_chapter">16</a>).</p>
+</dd>
+<dt>Making your app react to voice commands</dt>
+<dd>
+<p><a data-primary="speech recognition" data-type="indexterm" id="idm45983157963552"></a>This is speech recognition, which requires processing audio samples: since they are long and complex sequences, they are typically processed using RNNs, CNNs, or transformers (see Chapters <a data-type="xref" data-xrefstyle="select:labelnumber" href="HOMLWSKT020.xhtml#rnn_chapter">15</a> and <a data-type="xref" data-xrefstyle="select:labelnumber" href="HOMLWSKT021.xhtml#nlp_chapter">16</a>).</p>
+</dd>
+<dt>Detecting credit card fraud</dt>
+<dd>
+<p><a data-primary="anomaly detection" data-type="indexterm" id="idm45983157958720"></a>This is anomaly detection, which can be tackled using isolation forests, Gaussian mixture models (see <a data-type="xref" href="HOMLWSKT013.xhtml#unsupervised_learning_chapter">Chapter 9</a>), or autoencoders (see <a data-type="xref" href="HOMLWSKT022.xhtml#autoencoders_chapter">Chapter 17</a>).</p>
+</dd>
+<dt>Segmenting clients based on their purchases so that you can design a different marketing strategy for each segment</dt>
+<dd>
+<p><a data-primary="clustering algorithms" data-type="indexterm" id="idm45983157954832"></a>This is clustering, which can be achieved using <em>k</em>-means, DBSCAN, and more (see <a data-type="xref" href="HOMLWSKT013.xhtml#unsupervised_learning_chapter">Chapter 9</a>).</p>
+</dd>
+<dt>Representing a complex, high-dimensional dataset in a clear and insightful diagram</dt>
+<dd>
+<p><a data-primary="visualization of data" data-type="indexterm" id="idm45983157951520"></a>This is data visualization, often involving dimensionality reduction techniques (see <a data-type="xref" href="HOMLWSKT012.xhtml#dimensionality_chapter">Chapter 8</a>).</p>
+</dd>
+<dt>Recommending a product that a client may be interested in, based on past purchases</dt>
+<dd>
+<p><a data-primary="recommender system" data-type="indexterm" id="idm45983157564224"></a>This is a recommender system. One approach is to feed past purchases (and other information about the client) to an artificial neural network (see <a data-type="xref" href="HOMLWSKT015.xhtml#ann_chapter">Chapter 10</a>), and get it to output the most likely next purchase. This neural net would typically be trained on past sequences of purchases across all clients.</p>
+</dd>
+<dt>Building an intelligent bot for a game</dt>
+<dd>
+<p><a data-primary="reinforcement learning (RL)" data-secondary="examples of" data-type="indexterm" id="idm45983157561152"></a>This is often tackled using reinforcement learning (RL; see <a data-type="xref" href="HOMLWSKT023.xhtml#rl_chapter">Chapter 18</a>), which is a branch of machine learning that trains agents (such as bots) to pick the actions that will maximize their rewards over time (e.g., a bot may get a reward every time the player loses some life points), within a given environment (such as the game). The famous AlphaGo program that beat the world champion at the game of Go was built using RL.</p>
+</dd>
+</dl>
+<p>This list could go on and on, but hopefully it gives you a sense of the incredible breadth and complexity of the tasks that machine learning can tackle, and the types of techniques that you would use for each task.<a data-primary="" data-startref="ix_classif_ex" data-type="indexterm" id="idm45983156324576"></a><a data-primary="" data-startref="ix_ml_app_ex" data-type="indexterm" id="idm45983157558224"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Types of Machine Learning Systems" data-type="sect1"><div class="sect1" id="idm45983157557152">
+<h2 id="sigil_toc_id_18">Types of Machine Learning Systems</h2>
+<p>There are so many different types of machine learning systems that it is useful to classify them in broad categories, based on the following criteria:<a data-primary="machine learning (ML)" data-secondary="types of systems" data-type="indexterm" id="ix_ml_types_sys"></a></p>
+<ul>
+<li>
+<p>How they are supervised during training (supervised, unsupervised, semi-supervised, self-supervised, and others)</p>
+</li>
+<li>
+<p>Whether or not they can learn incrementally on the fly (online versus batch learning)</p>
+</li>
+<li>
+<p>Whether they work by simply comparing new data points to known data points, or instead by detecting patterns in the training data and building a predictive model, much like scientists do (instance-based versus model-based learning)</p>
+</li>
+</ul>
+<p>These criteria are not exclusive; you can combine them in any way you like. <a data-primary="spam filters" data-type="indexterm" id="ix_spam_filter2"></a>For example, a state-of-the-art spam filter may learn on the fly using a deep neural network model trained using human-provided examples of spam and ham; this makes it an online, model-based, supervised learning system.</p>
+<p>Let’s look at each of these criteria a bit more closely.</p>
+<section data-pdf-bookmark="Training Supervision" data-type="sect2"><div class="sect2" id="idm45983157548880">
+<h2 id="sigil_toc_id_19" class="sigil_not_in_toc">Training Supervision</h2>
+<p>ML systems can be classified according to the amount and type of supervision they get during training. There are many categories, but we’ll discuss the main ones: supervised learning, unsupervised learning, self-supervised learning, semi-supervised learning, and reinforcement learning.</p>
+<section data-pdf-bookmark="Supervised learning" data-type="sect3"><div class="sect3" id="idm45983157547184">
+<h3 class="sigil_not_in_toc">Supervised learning</h3>
+<p><a data-primary="supervised learning" data-type="indexterm" id="idm45983157545744"></a>In <em>supervised learning</em>, the training set you feed to the algorithm includes the desired solutions, called <em>labels</em> (<a data-type="xref" href="#supervised_learning_diagram">Figure 1-5</a>).</p>
+<figure><div class="figure" id="supervised_learning_diagram">
+<img alt="mls3 0105" height="250" src="../Images/mls3_0105.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-5. </span>A labeled training set for spam classification (an example of supervised learning)</h6>
+</div>
+</figure>
+<p>A typical supervised learning task is <em>classification</em>. The spam filter is a good example of this: it is trained with many example emails along with their <em>class</em> (spam or ham), and it must learn how to classify new emails.</p>
+<p>Another typical task is to predict a <em>target</em> numeric value, such as the price of a car, given a set of <em>features</em> (mileage, age, brand, etc.). This sort of task is called <em>regression</em> (<a data-type="xref" href="#regression_diagram">Figure 1-6</a>).⁠<sup><a data-type="noteref" href="#idm45983158170336" id="idm45983158170336-marker">1</a></sup> To train the system, you need to give it many examples of cars, including both their features and their targets (i.e., their prices).</p>
+<p>Note that some regression models can be used for classification as well, and vice versa. <a data-primary="regression models" data-secondary="and classification" data-secondary-sortas="classification" data-type="indexterm" id="idm45983158167744"></a><a data-primary="logistic regression" data-type="indexterm" id="idm45983158166496"></a><a data-primary="classification" data-secondary="and regression" data-secondary-sortas="regression" data-type="indexterm" id="idm45983158165824"></a><a data-primary="" data-startref="ix_spam_filter2" data-type="indexterm" id="idm45983158164608"></a>For example, <em>logistic regression</em> is commonly used for classification, as it can output a value that corresponds to the probability of belonging to a given class (e.g., 20% chance of being spam).</p>
+<figure class="smallerninety"><div class="figure" id="regression_diagram">
+<img alt="mls3 0106" height="294" src="../Images/mls3_0106.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-6. </span>A regression problem: predict a value, given an input feature (there are usually multiple input features, and sometimes multiple output values)</h6>
+</div>
+</figure>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p><a data-primary="labels" data-secondary="supervised learning" data-type="indexterm" id="idm45983149945376"></a>The words <em>target</em> and <em>label</em> are generally treated as synonyms in supervised learning, but <em>target</em> is more common in regression tasks and <em>label</em> is more common in classification tasks. <a data-primary="predictors" data-seealso="ensemble learning" data-type="indexterm" id="idm45983149942608"></a><a data-primary="attributes" data-secondary="unsupervised learning" data-type="indexterm" id="idm45983149941632"></a><a data-primary="features" data-type="indexterm" id="idm45983149940688"></a>Moreover, <em>features</em> are sometimes called <em>predictors</em> or <em>attributes</em>. These terms may refer to individual samples (e.g., “this car’s mileage feature is equal to 15,000”) or to all samples (e.g., “the mileage feature is strongly correlated with price”).</p>
+</div>
+</div>
+</section>
+<section data-pdf-bookmark="Unsupervised learning" data-type="sect3"><div class="sect3" id="idm45983149938240">
+<h3 class="sigil_not_in_toc">Unsupervised learning</h3>
+<p><a data-primary="unsupervised learning" data-type="indexterm" id="ix_unsuper_learn"></a>In <em>unsupervised learning</em>, as you might guess, the training data is unlabeled (<a data-type="xref" href="#unsupervised_learning_diagram">Figure 1-7</a>). The system tries to learn without a teacher.</p>
+<p>For example, say you have a lot of data about your blog’s visitors. <a data-primary="clustering algorithms" data-type="indexterm" id="idm45983149933840"></a>You may want to run a <em>clustering</em> algorithm to try to detect groups of similar visitors (<a data-type="xref" href="#clustering_diagram">Figure 1-8</a>). At no point do you tell the algorithm which group a visitor belongs to: it finds those connections without your help. For example, it might notice that 40% of your visitors are teenagers who love comic books and generally read your blog after school, while 20% are adults who enjoy sci-fi and who visit during the weekends. <a data-primary="hierarchical clustering" data-type="indexterm" id="idm45983149931760"></a>If you use a <em>hierarchical clustering</em> algorithm, it may also subdivide each group into smaller groups. This may help you target your posts for each group.</p>
+<figure class="smallersixty"><div class="figure" id="unsupervised_learning_diagram">
+<img alt="mls3 0107" height="372" src="../Images/mls3_0107.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-7. </span>An unlabeled training set for unsupervised learning</h6>
+</div>
+</figure>
+<figure class="width-70"><div class="figure" id="clustering_diagram">
+<img alt="mls3 0108" height="288" src="../Images/mls3_0108.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-8. </span>Clustering</h6>
+</div>
+</figure>
+<p><em>Visualization</em> algorithms are also good examples of unsupervised learning: you feed them a lot of complex and unlabeled data, and they output a 2D or 3D representation of your data that can easily be plotted (<a data-type="xref" href="#socher_ganjoo_manning_ng_2013_paper">Figure 1-9</a>). <a data-primary="visualization of data" data-type="indexterm" id="ix_visualize_ch1"></a><a data-primary="unsupervised learning" data-secondary="visualization algorithms" data-type="indexterm" id="ix_unsuper_visual"></a>These algorithms try to preserve as much structure as they can (e.g., trying to keep separate clusters in the input space from overlapping in the visualization) so that you can understand how the data is organized and perhaps identify unsuspected patterns.</p>
+<p><a data-primary="dimensionality reduction" data-type="indexterm" id="idm45983158570720"></a>A related task is <em>dimensionality reduction</em>, in which the goal is to simplify the data without losing too much information. One way to do this is to merge several correlated features into one. For example, a car’s mileage may be strongly correlated with its age, so the dimensionality reduction algorithm will merge them into one feature that represents the car’s wear and tear. <a data-primary="feature extraction" data-type="indexterm" id="idm45983158569456"></a>This is called <em>feature extraction</em>.</p>
+<figure class="smallerninety"><div class="figure" id="socher_ganjoo_manning_ng_2013_paper">
+<img alt="mls3 0109" height="395" src="../Images/mls3_0109.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-9. </span>Example of a t-SNE visualization highlighting semantic clusters⁠<sup><a data-type="noteref" href="#idm45983158566032" id="idm45983158566032-marker">2</a></sup></h6>
+</div>
+</figure>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>It is often a good idea to try to reduce the number of dimensions in your training data using a dimensionality reduction algorithm before you feed it to another machine learning algorithm (such as a supervised learning algorithm). It will run much faster, the data will take up less disk and memory space, and in some cases it may also perform better.<a data-primary="" data-startref="ix_unsuper_visual" data-type="indexterm" id="idm45983158563744"></a><a data-primary="" data-startref="ix_visualize_ch1" data-type="indexterm" id="idm45983158562768"></a></p>
+</div>
+<p><a data-primary="unsupervised learning" data-secondary="anomaly detection" data-type="indexterm" id="idm45983158561440"></a><a data-primary="anomaly detection" data-type="indexterm" id="idm45983158560272"></a>Yet another important unsupervised task is <em>anomaly detection</em>—for example, detecting unusual credit card transactions to prevent fraud, catching manufacturing defects, or automatically removing outliers from a dataset before feeding it to another learning algorithm. The system is shown mostly normal instances during training, so it learns to recognize them; then, when it sees a new instance, it can tell whether it looks like a normal one or whether it is likely an anomaly (see <a data-type="xref" href="#anomaly_detection_diagram">Figure 1-10</a>). <a data-primary="novelty detection" data-type="indexterm" id="idm45983158558224"></a><a data-primary="unsupervised learning" data-secondary="novelty detection" data-type="indexterm" id="idm45983158557520"></a>A very similar task is <em>novelty detection</em>: it aims to detect new instances that look different from all instances in the training set. This requires having a very “clean” training set, devoid of any instance that you would like the algorithm to detect. For example, if you have thousands of pictures of dogs, and 1% of these pictures represent Chihuahuas, then a novelty detection algorithm should not treat new pictures of Chihuahuas as novelties. On the other hand, anomaly detection algorithms may consider these dogs as so rare and so different from other dogs that they would likely classify them as anomalies (no offense to Chihuahuas).</p>
+<figure class="width-70"><div class="figure" id="anomaly_detection_diagram">
+<img alt="mls3 0110" height="274" src="../Images/mls3_0110.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-10. </span>Anomaly detection</h6>
+</div>
+</figure>
+<p><a data-primary="unsupervised learning" data-secondary="association rule learning" data-type="indexterm" id="idm45983158726976"></a><a data-primary="association rule learning" data-type="indexterm" id="idm45983158726032"></a>Finally, another common unsupervised task is <em>association rule learning</em>, in which the goal is to dig into large amounts of data and discover interesting relations between attributes. For example, suppose you own a supermarket. Running an association rule on your sales logs may reveal that people who purchase barbecue sauce and potato chips also tend to buy steak. Thus, you may want to place these items close to one another.<a data-primary="" data-startref="ix_unsuper_learn" data-type="indexterm" id="idm45983158724816"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Semi-supervised learning" data-type="sect3"><div class="sect3" id="idm45983158723616">
+<h3 class="sigil_not_in_toc">Semi-supervised learning</h3>
+<p><a data-primary="semi-supervised learning" data-type="indexterm" id="idm45983158722208"></a>Since labeling data is usually time-consuming and costly, you will often have plenty of unlabeled instances, and few labeled instances. Some algorithms can deal with data that’s partially labeled. This is called <em>semi-supervised learning</em> (<a data-type="xref" href="#semi_supervised_learning_diagram">Figure 1-11</a>).</p>
+<figure class="width-70"><div class="figure" id="semi_supervised_learning_diagram">
+<img alt="mls3 0111" height="274" src="../Images/mls3_0111.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-11. </span>Semi-supervised learning with two classes (triangles and squares): the unlabeled examples (circles) help classify a new instance (the cross) into the triangle class rather than the square class, even though it is closer to the labeled squares</h6>
+</div>
+</figure>
+<p>Some photo-hosting services, such as Google Photos, are good examples of this. Once you upload all your family photos to the service, it automatically recognizes that the same person A shows up in photos 1, 5, and 11, while another person B shows up in photos 2, 5, and 7. This is the unsupervised part of the algorithm (clustering). Now all the system needs is for you to tell it who these people are. Just add one label per person⁠<sup><a data-type="noteref" href="#idm45983158717360" id="idm45983158717360-marker">3</a></sup> and it is able to name everyone in every photo, which is useful for searching photos.</p>
+<p>Most semi-supervised learning algorithms are combinations of unsupervised and supervised algorithms. For example, a clustering algorithm may be used to group similar instances together, and then every unlabeled instance can be labeled with the most common label in its cluster. Once the whole dataset is labeled, it is possible to use any supervised learning algorithm.</p>
+</div>
+</section>
+<section data-pdf-bookmark="Self-supervised learning" data-type="sect3"><div class="sect3" id="idm45983158716160">
+<h3 class="sigil_not_in_toc">Self-supervised learning</h3>
+<p>Another approach to machine learning involves actually generating a fully labeled dataset from a fully unlabeled one. <a data-primary="self-supervised learning" data-type="indexterm" id="ix_self_super_learn"></a>Again, once the whole dataset is labeled, any supervised learning algorithm can be used. This approach is called <em>self-supervised learning</em>.</p>
+<p>For example, if you have a large dataset of unlabeled images, you can randomly mask a small part of each image and then train a model to recover the original image (<a data-type="xref" href="#self_supervised_learning_diagram">Figure 1-12</a>). During training, the masked images are used as the inputs to the model, and the original images are used as the labels.</p>
+<figure class="smallerseventy"><div class="figure" id="self_supervised_learning_diagram">
+<img alt="mls3 0112" height="301" src="../Images/mls3_0112.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-12. </span>Self-supervised learning example: input (left) and target (right)</h6>
+</div>
+</figure>
+<p>The resulting model may be quite useful in itself—for example, to repair damaged images or to erase unwanted objects from pictures. But more often than not, a model trained using self-supervised learning is not the final goal. You’ll usually want to tweak and fine-tune the model for a slightly different task—one that you actually care about.</p>
+<p>For example, suppose that what you really want is to have a pet classification model: given a picture of any pet, it will tell you what species it belongs to. If you have a large dataset of unlabeled photos of pets, you can start by training an image-repairing model using self-supervised learning. Once it’s performing well, it should be able to distinguish different pet species: when it repairs an image of a cat whose 
+<span class="keep-together">face is</span> masked, it must know not to add a dog’s face. Assuming your model’s architecture allows it (and most neural network architectures do), it is then possible to tweak the model so that it predicts pet species instead of repairing images. The final step consists of fine-tuning the model on a labeled dataset: the model already knows what cats, dogs, and other pet species look like, so this step is only needed so the model can learn the mapping between the species it already knows and the labels we expect 
+<span class="keep-together">from it.</span></p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p><a data-primary="deep neural networks (DNNs)" data-secondary="and transfer learning" data-secondary-sortas="transfer learning" data-type="indexterm" id="idm45983158706336"></a><a data-primary="transfer learning" data-type="indexterm" id="idm45983156537760"></a>Transferring knowledge from one task to another is called <em>transfer learning</em>, and it’s one of the most important techniques in machine learning today, especially when using <em>deep neural networks</em> (i.e., neural networks composed of many layers of neurons). We will discuss this in detail in <a data-type="xref" href="HOMLWSKT014.xhtml#neural_nets_part">Part II</a>.</p>
+</div>
+<p>Some people consider self-supervised learning to be a part of unsupervised learning, since it deals with fully unlabeled datasets. But self-supervised learning uses (generated) labels during training, so in that regard it’s closer to supervised learning. And the term “unsupervised learning” is generally used when dealing with tasks like clustering, dimensionality reduction, or anomaly detection, whereas self-supervised learning focuses on the same tasks as supervised learning: mainly classification and regression. In short, it’s best to treat self-supervised learning as its own category.<a data-primary="" data-startref="ix_self_super_learn" data-type="indexterm" id="idm45983156534560"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Reinforcement learning" data-type="sect3"><div class="sect3" id="idm45983156533328">
+<h3 class="sigil_not_in_toc">Reinforcement learning</h3>
+<p><em>Reinforcement learning</em> is a very different beast. <a data-primary="penalties, reinforcement learning" data-type="indexterm" id="idm45983156531520"></a><a data-primary="policy, reinforcement learning" data-type="indexterm" id="idm45983156530800"></a><a data-primary="agents, reinforcement learning" data-type="indexterm" id="idm45983156530112"></a><a data-primary="reinforcement learning (RL)" data-type="indexterm" id="idm45983156529424"></a><a data-primary="rewards, reinforcement learning" data-type="indexterm" id="idm45983156528736"></a>The learning system, called an <em>agent</em> in this context, can observe the environment, select and perform actions, and get <em>rewards</em> in return (or <em>penalties</em> in the form of negative rewards, as shown in <a data-type="xref" href="#reinforcement_learning_diagram">Figure 1-13</a>). It must then learn by itself what is the best strategy, called a <em>policy</em>, to get the most reward over time. A policy defines what action the agent should choose when it is in a given situation.</p>
+<figure><div class="figure" id="reinforcement_learning_diagram">
+<img alt="mls3 0113" height="510" src="../Images/mls3_0113.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-13. </span>Reinforcement learning</h6>
+</div>
+</figure>
+<p>For example, many robots implement reinforcement learning algorithms to learn how to walk. <a data-primary="AlphaGo" data-type="indexterm" id="idm45983156522720"></a><a data-primary="DeepMind" data-type="indexterm" id="idm45983156522016"></a>DeepMind’s AlphaGo program is also a good example of reinforcement learning: it made the headlines in May 2017 when it beat Ke Jie, the number one ranked player in the world at the time, at the game of Go. It learned its winning policy by analyzing millions of games, and then playing many games against itself. Note that learning was turned off during the games against the champion; AlphaGo was just applying the policy it had learned. As you will see in the next section, this is called <em>offline learning</em>.</p>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Batch Versus Online Learning" data-type="sect2"><div class="sect2" id="idm45983156520576">
+<h2 id="sigil_toc_id_20" class="sigil_not_in_toc">Batch Versus Online Learning</h2>
+<p>Another criterion used to classify machine learning systems is whether or not the system can learn incrementally from a stream of incoming data.</p>
+<section class="less_space pagebreak-before" data-pdf-bookmark="Batch learning" data-type="sect3"><div class="sect3" id="idm45983156518960">
+<h3 class="sigil_not_in_toc">Batch learning</h3>
+<p>In <em>batch learning</em>, the system is incapable of learning incrementally: it must be trained using all the available data. <a data-primary="batch learning" data-type="indexterm" id="ix_batch_learn"></a>This will generally take a lot of time and computing resources, so it is typically done offline. First the system is trained, and then it is launched into production and runs without learning anymore; it just applies what it has learned. <a data-primary="offline learning" data-type="indexterm" id="idm45983158387600"></a>This is called <em>offline learning</em>.</p>
+<p>Unfortunately, a model’s performance tends to decay slowly over time, simply because the world continues to evolve while the model remains unchanged. <a data-primary="data drift" data-type="indexterm" id="idm45983158385936"></a><a data-primary="model rot" data-type="indexterm" id="idm45983158385232"></a>This phenomenon is often called <em>model rot</em> or <em>data drift</em>. The solution is to regularly retrain the model on up-to-date data. How often you need to do that depends on the use case: if the model classifies pictures of cats and dogs, its performance will decay very slowly, but if the model deals with fast-evolving systems, for example making predictions on the financial market, then it is likely to decay quite fast.</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>Even a model trained to classify pictures of cats and dogs may need to be retrained regularly, not because cats and dogs will mutate overnight, but because cameras keep changing, along with image formats, sharpness, brightness, and size ratios. Moreover, people may love different breeds next year, or they may decide to dress their pets with tiny hats—who knows?</p>
+</div>
+<p>If you want a batch learning system to know about new data (such as a new type of spam), you need to train a new version of the system from scratch on the full dataset (not just the new data, but also the old data), then replace the old model with the new one. Fortunately, the whole process of training, evaluating, and launching a machine learning system can be automated fairly easily (as we saw in <a data-type="xref" href="#adapting_to_change_diagram">Figure 1-3</a>), so even a batch learning system can adapt to change. Simply update the data and train a new version of the system from scratch as often as needed.</p>
+<p>This solution is simple and often works fine, but training using the full set of data can take many hours, so you would typically train a new system only every 24 hours or even just weekly. If your system needs to adapt to rapidly changing data (e.g., to predict stock prices), then you need a more reactive solution.</p>
+<p>Also, training on the full set of data requires a lot of computing resources (CPU, memory space, disk space, disk I/O, network I/O, etc.). If you have a lot of data and you automate your system to train from scratch every day, it will end up costing you a lot of money. If the amount of data is huge, it may even be impossible to use a batch learning algorithm.</p>
+<p class="less_space pagebreak-before">Finally, if your system needs to be able to learn autonomously and it has limited resources (e.g., a smartphone application or a rover on Mars), then carrying around large amounts of training data and taking up a lot of resources to train for hours every day is a showstopper.</p>
+<p>A better option in all these cases is to use algorithms that are capable of learning incrementally.<a data-primary="" data-startref="ix_batch_learn" data-type="indexterm" id="idm45983158378576"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Online learning" data-type="sect3"><div class="sect3" id="idm45983158377344">
+<h3 class="sigil_not_in_toc">Online learning</h3>
+<p><a data-primary="online learning" data-type="indexterm" id="ix_online_learn"></a>In <em>online learning</em>, you train the system incrementally by feeding it data instances sequentially, either individually or in small groups called <em>mini-batches</em>. <a data-primary="mini-batches" data-type="indexterm" id="idm45983158373744"></a>Each learning step is fast and cheap, so the system can learn about new data on the fly, as it arrives (see <a data-type="xref" href="#online_learning_diagram">Figure 1-14</a>).</p>
+<figure class="smallereighty"><div class="figure" id="online_learning_diagram">
+<img alt="mls3 0114" height="326" src="../Images/mls3_0114.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-14. </span>In online learning, a model is trained and launched into production, and then it keeps learning as new data comes in</h6>
+</div>
+</figure>
+<p>Online learning is useful for systems that need to adapt to change extremely rapidly (e.g., to detect new patterns in the stock market). It is also a good option if you have limited computing resources; for example, if the model is trained on a mobile device.</p>
+<p><a data-primary="out-of-core learning" data-type="indexterm" id="idm45983158368864"></a>Additionally, online learning algorithms can be used to train models on huge datasets that cannot fit in one machine’s main memory (this is called <em>out-of-core</em> learning). The algorithm loads part of the data, runs a training step on that data, and repeats the process until it has run on all of the data (see <a data-type="xref" href="#ol_for_huge_datasets_diagram">Figure 1-15</a>).</p>
+<figure class="smallereighty"><div class="figure" id="ol_for_huge_datasets_diagram">
+<img alt="mls3 0115" height="403" src="../Images/mls3_0115.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-15. </span>Using online learning to handle huge datasets</h6>
+</div>
+</figure>
+<p>One important parameter of online learning systems is how fast they should adapt to changing data: <a data-primary="learning rate" data-type="indexterm" id="idm45983155345248"></a>this is called the <em>learning rate</em>. If you set a high learning rate, then your system will rapidly adapt to new data, but it will also tend to quickly forget the old data (and you don’t want a spam filter to flag only the latest kinds of spam it was shown). Conversely, if you set a low learning rate, the system will have more inertia; that is, it will learn more slowly, but it will also be less sensitive to noise in the new data or to sequences of nonrepresentative data points (outliers).</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>Out-of-core learning is usually done offline (i.e., not on the live system), so <em>online learning</em> can be a confusing name. <a data-primary="incremental learning" data-type="indexterm" id="idm45983155342384"></a>Think of it as <em>incremental learning</em>.</p>
+</div>
+<p>A big challenge with online learning is that if bad data is fed to the system, the system’s performance will decline, possibly quickly (depending on the data quality and learning rate). If it’s a live system, your clients will notice. For example, bad data could come from a bug (e.g., a malfunctioning sensor on a robot), or it could come from someone trying to game the system (e.g., spamming a search engine to try to rank high in search results). To reduce this risk, you need to monitor your system closely and promptly switch learning off (and possibly revert to a previously working state) if you detect a drop in performance. You may also want to monitor the input data and react to abnormal data; for example, using an anomaly detection algorithm (see <a data-type="xref" href="HOMLWSKT013.xhtml#unsupervised_learning_chapter">Chapter 9</a>).<a data-primary="" data-startref="ix_online_learn" data-type="indexterm" id="idm45983155339664"></a></p>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Instance-Based Versus Model-Based Learning" data-type="sect2"><div class="sect2" id="idm45983155338432">
+<h2 id="sigil_toc_id_21" class="sigil_not_in_toc">Instance-Based Versus Model-Based Learning</h2>
+<p>One more way to categorize machine learning systems is by how they <em>generalize</em>. Most machine learning tasks are about making predictions. This means that given a number of training examples, the system needs to be able to make good predictions for (generalize to) examples it has never seen before. Having a good performance measure on the training data is good, but insufficient; the true goal is to perform well on new instances.</p>
+<p>There are two main approaches to generalization: instance-based learning and model-based learning.</p>
+<section data-pdf-bookmark="Instance-based learning" data-type="sect3"><div class="sect3" id="idm45983155335856">
+<h3 class="sigil_not_in_toc">Instance-based learning</h3>
+<p>Possibly the most trivial form of learning is simply to learn by heart. If you were to create a spam filter this way, it would just flag all emails that are identical to emails that have already been flagged by users—not the worst solution, but certainly not the best.</p>
+<p>Instead of just flagging emails that are identical to known spam emails, your spam filter could be programmed to also flag emails that are very similar to known spam emails. <a data-primary="measure of similarity" data-type="indexterm" id="idm45983155333680"></a>This requires a <em>measure of similarity</em> between two emails. A (very basic) similarity measure between two emails could be to count the number of words they have in common. The system would flag an email as spam if it has many words in common with a known spam email.</p>
+<p><a data-primary="instance-based learning" data-type="indexterm" id="idm45983155332144"></a>This is called <em>instance-based learning</em>: the system learns the examples by heart, then generalizes to new cases by using a similarity measure to compare them to the learned examples (or a subset of them). For example, in <a data-type="xref" href="#instance_based_learning_diagram">Figure 1-16</a> the new instance would be classified as a triangle because the majority of the most similar instances belong to that class.</p>
+<figure class="width-75"><div class="figure" id="instance_based_learning_diagram">
+<img alt="mls3 0116" height="274" src="../Images/mls3_0116.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-16. </span>Instance-based learning</h6>
+</div>
+</figure>
+</div>
+</section>
+<section data-pdf-bookmark="Model-based learning and a typical machine learning workflow" data-type="sect3"><div class="sect3" id="model_based_learning">
+<h3 class="sigil_not_in_toc">Model-based learning and a typical machine learning workflow</h3>
+<p>Another way to generalize from a set of examples is to build a model of these examples and then use that model to make <em>predictions</em>. <a data-primary="model-based learning" data-type="indexterm" id="ix_model_base_learn"></a>This is called <em>model-based learning</em> (<a data-type="xref" href="#model_based_learning_diagram">Figure 1-17</a>).</p>
+<figure class="width-75"><div class="figure" id="model_based_learning_diagram">
+<img alt="mls3 0117" height="284" src="../Images/mls3_0117.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-17. </span>Model-based learning</h6>
+</div>
+</figure>
+<p>For example, suppose you want to know if money makes people happy, so you download the Better Life Index data from the <a href="https://www.oecdbetterlifeindex.org">OECD’s website</a> and <a href="https://ourworldindata.org">World Bank stats</a> about gross domestic product (GDP) per capita. <a data-primary="life satisfaction dataset" data-type="indexterm" id="idm45983158941552"></a>Then you join the tables and sort by GDP per capita. <a data-type="xref" href="#life_satisfaction_table_excerpt">Table 1-1</a> shows an excerpt of what you get.</p>
+<table id="life_satisfaction_table_excerpt">
+<caption><span class="label">Table 1-1. </span>Does money make people happier?</caption>
+<thead>
+<tr>
+<th>Country</th>
+<th>GDP per capita (USD)</th>
+<th>Life satisfaction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><p>Turkey</p>
+</td>
+<td><p>28,384</p>
+</td>
+<td><p>5.5</p>
+</td>
+</tr>
+<tr>
+<td><p>Hungary</p>
+</td>
+<td><p>31,008</p>
+</td>
+<td><p>5.6</p>
+</td>
+</tr>
+<tr>
+<td><p>France</p>
+</td>
+<td><p>42,026</p>
+</td>
+<td><p>6.5</p>
+</td>
+</tr>
+<tr>
+<td><p>United States</p>
+</td>
+<td><p>60,236</p>
+</td>
+<td><p>6.9</p>
+</td>
+</tr>
+<tr>
+<td><p>New Zealand</p>
+</td>
+<td><p>42,404</p>
+</td>
+<td><p>7.3</p>
+</td>
+</tr>
+<tr>
+<td><p>Australia</p>
+</td>
+<td><p>48,698</p>
+</td>
+<td><p>7.3</p>
+</td>
+</tr>
+<tr>
+<td><p>Denmark</p>
+</td>
+<td><p>55,938</p>
+</td>
+<td><p>7.6</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Let’s plot the data for these countries (<a data-type="xref" href="#money_happy_scatterplot">Figure 1-18</a>).</p>
+<figure class="smallersixtyfive"><div class="figure" id="money_happy_scatterplot">
+<img alt="mls3 0118" height="338" src="../Images/mls3_0118.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-18. </span>Do you see a trend here?</h6>
+</div>
+</figure>
+<p>There does seem to be a trend here! Although the data is <em>noisy</em> (i.e., partly random), it looks like life satisfaction goes up more or less linearly as the country’s GDP per capita increases. <a data-primary="model selection" data-type="indexterm" id="idm45983157931856"></a>So you decide to model life satisfaction as a linear function of GDP per capita. <a data-primary="linear models" data-secondary="training and running example" data-type="indexterm" id="idm45983157931024"></a>This step is called <em>model selection</em>: you selected a <em>linear model</em> of life satisfaction with just one attribute, GDP per capita (<a data-type="xref" href="#a_simple_linear_model">Equation 1-1</a>).</p>
+<div data-type="equation" id="a_simple_linear_model">
+<h5 class="sigil_not_in_toc"><span class="label">Equation 1-1. </span>A simple linear model</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mrow>
+<mtext>life_satisfaction</mtext>
+<mo>=</mo>
+<msub><mi>θ</mi> <mn>0</mn> </msub>
+<mo>+</mo>
+<msub><mi>θ</mi> <mn>1</mn> </msub>
+<mo>×</mo>
+<mtext>GDP_per_capita</mtext>
+</mrow>
+</math>
+</div>
+<p><a data-primary="model parameters" data-type="indexterm" id="idm45983157920704"></a>This model has two <em>model parameters</em>, <em>θ</em><sub>0</sub> and <em>θ</em><sub>1</sub>.⁠<sup><a data-type="noteref" href="#idm45983158299520" id="idm45983158299520-marker">4</a></sup> By tweaking these parameters, you can make your model represent any linear function, as shown in <a data-type="xref" href="#tweaking_model_params_plot">Figure 1-19</a>.</p>
+<figure class="smallersixtyfive"><div class="figure" id="tweaking_model_params_plot">
+<img alt="mls3 0119" height="338" src="../Images/mls3_0119.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-19. </span>A few possible linear models</h6>
+</div>
+</figure>
+<p>Before you can use your model, you need to define the parameter values <em>θ</em><sub>0</sub> and <em>θ</em><sub>1</sub>. How can you know which values will make your model perform best? To answer this question, you need to specify a performance measure. <a data-primary="fitness function" data-type="indexterm" id="idm45983158293104"></a><a data-primary="utility function" data-type="indexterm" id="idm45983158292400"></a>You can either define a <em>utility function</em> (or <em>fitness function</em>) that measures how <em>good</em> your model is, or you can define a <em>cost function</em> that measures how <em>bad</em> it is. <a data-primary="cost function" data-type="indexterm" id="idm45983158289408"></a>For linear regression problems, people typically use a cost function that measures the distance between the linear model’s predictions and the training examples; the objective is to minimize this distance.</p>
+<p><a data-primary="linear regression" data-type="indexterm" id="ix_linear_regress_ch1"></a>This is where the linear regression algorithm comes in: you feed it your training examples, and it finds the parameters that make the linear model fit best to your data. <a data-primary="training" data-type="indexterm" id="idm45983158287056"></a>This is called <em>training</em> the model. In our case, the algorithm finds that the optimal parameter values are <em>θ</em><sub>0</sub> = 3.75 and <em>θ</em><sub>1</sub> = 6.78 × 10<sup>–5</sup>.</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>Confusingly, the word “model” can refer to a <em>type of model</em> (e.g., linear regression), to a <em>fully specified model architecture</em> (e.g., linear regression with one input and one output), or to the <em>final trained model</em> ready to be used for predictions (e.g., linear regression with one input and one output, using <em>θ</em><sub>0</sub> = 3.75 and <em>θ</em><sub>1</sub> = 6.78 × 10<sup>–5</sup>). Model selection consists in choosing the type of model and fully specifying its architecture. Training a model means running an algorithm to find the model parameters that will make it best fit the training data, and hopefully make good predictions on new data.</p>
+</div>
+<p>Now the model fits the training data as closely as possible (for a linear model), as you can see in <a data-type="xref" href="#best_fit_model_plot">Figure 1-20</a>.</p>
+<figure class="smallersixtyfive"><div class="figure" id="best_fit_model_plot">
+<img alt="mls3 0120" height="338" src="../Images/mls3_0120.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-20. </span>The linear model that fits the training data best</h6>
+</div>
+</figure>
+<p class="pagebreak-before">You are finally ready to run the model to make predictions. For example, say you want to know how happy Cypriots are, and the OECD data does not have the answer. Fortunately, you can use your model to make a good prediction: you look up Cyprus’s GDP per capita, find $37,655, and then apply your model and find that life satisfaction is likely to be somewhere around 3.75 + 37,655 × 6.78 × 10<sup>–5</sup> = 6.30.</p>
+<p><a data-primary="Scikit-Learn" data-secondary="sklearn.linear_model.LinearRegression" data-type="indexterm" id="idm45983158410896"></a>To whet your appetite, <a data-type="xref" href="#example_scikit_code">Example 1-1</a> shows the Python code that loads the data, separates the inputs <code>X</code> from the labels <code>y</code>, creates a scatterplot for visualization, and then trains a linear model and makes a prediction.⁠<sup><a data-type="noteref" href="#idm45983158408048" id="idm45983158408048-marker">5</a></sup></p>
+<div data-type="example" id="example_scikit_code">
+<h5 class="sigil_not_in_toc"><span class="label">Example 1-1. </span>Training and running a linear model using Scikit-Learn</h5>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">import</code> <code class="nn">matplotlib.pyplot</code> <code class="k">as</code> <code class="nn">plt</code>
+<code class="kn">import</code> <code class="nn">numpy</code> <code class="k">as</code> <code class="nn">np</code>
+<code class="kn">import</code> <code class="nn">pandas</code> <code class="k">as</code> <code class="nn">pd</code>
+<code class="kn">from</code> <code class="nn">sklearn.linear_model</code> <code class="kn">import</code> <code class="n">LinearRegression</code>
+
+<code class="c1"># Download and prepare the data</code>
+<code class="n">data_root</code> <code class="o">=</code> <code class="s2">"https://github.com/ageron/data/raw/main/"</code>
+<code class="n">lifesat</code> <code class="o">=</code> <code class="n">pd</code><code class="o">.</code><code class="n">read_csv</code><code class="p">(</code><code class="n">data_root</code> <code class="o">+</code> <code class="s2">"lifesat/lifesat.csv"</code><code class="p">)</code>
+<code class="n">X</code> <code class="o">=</code> <code class="n">lifesat</code><code class="p">[[</code><code class="s2">"GDP per capita (USD)"</code><code class="p">]]</code><code class="o">.</code><code class="n">values</code>
+<code class="n">y</code> <code class="o">=</code> <code class="n">lifesat</code><code class="p">[[</code><code class="s2">"Life satisfaction"</code><code class="p">]]</code><code class="o">.</code><code class="n">values</code>
+
+<code class="c1"># Visualize the data</code>
+<code class="n">lifesat</code><code class="o">.</code><code class="n">plot</code><code class="p">(</code><code class="n">kind</code><code class="o">=</code><code class="s1">'scatter'</code><code class="p">,</code> <code class="n">grid</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code>
+             <code class="n">x</code><code class="o">=</code><code class="s2">"GDP per capita (USD)"</code><code class="p">,</code> <code class="n">y</code><code class="o">=</code><code class="s2">"Life satisfaction"</code><code class="p">)</code>
+<code class="n">plt</code><code class="o">.</code><code class="n">axis</code><code class="p">([</code><code class="mi">23_500</code><code class="p">,</code> <code class="mi">62_500</code><code class="p">,</code> <code class="mi">4</code><code class="p">,</code> <code class="mi">9</code><code class="p">])</code>
+<code class="n">plt</code><code class="o">.</code><code class="n">show</code><code class="p">()</code>
+
+<code class="c1"># Select a linear model</code>
+<code class="n">model</code> <code class="o">=</code> <code class="n">LinearRegression</code><code class="p">()</code>
+
+<code class="c1"># Train the model</code>
+<code class="n">model</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">,</code> <code class="n">y</code><code class="p">)</code>
+
+<code class="c1"># Make a prediction for Cyprus</code>
+<code class="n">X_new</code> <code class="o">=</code> <code class="p">[[</code><code class="mf">37_655.2</code><code class="p">]]</code>  <code class="c1"># Cyprus' GDP per capita in 2020</code>
+<code class="nb">print</code><code class="p">(</code><code class="n">model</code><code class="o">.</code><code class="n">predict</code><code class="p">(</code><code class="n">X_new</code><code class="p">))</code> <code class="c1"># output: [[6.30165767]]</code></pre>
+</div>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p><a data-primary="instance-based learning" data-type="indexterm" id="idm45983158244464"></a>If you had used an instance-based learning algorithm instead, you would have found that Israel has the closest GDP per capita to that of Cyprus ($38,341), and since the OECD data tells us that Israelis’ life satisfaction is 7.2, you would have predicted a life satisfaction of 7.2 for Cyprus. If you zoom out a bit and look at the two next-closest countries, you will find Lithuania and Slovenia, both with a life satisfaction of 5.9. Averaging these three values, you get 6.33, which is pretty close to your model-based prediction. <a data-primary="k-nearest neighbors regression" data-type="indexterm" id="idm45983158243728"></a>This simple algorithm is called <em>k-nearest neighbors</em> regression (in this example, <em>k</em> = 3).</p>
+<p><a data-primary="Scikit-Learn" data-secondary="sklearn.neighbors.KNeighborsRegressor" data-type="indexterm" id="idm45983158201728"></a>Replacing the linear regression model with <em>k</em>-nearest neighbors regression in the previous code is as easy as replacing these lines:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.linear_model</code> <code class="kn">import</code> <code class="n">LinearRegression</code>
+<code class="n">model</code> <code class="o">=</code> <code class="n">LinearRegression</code><code class="p">()</code></pre>
+<p>with these two:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.neighbors</code> <code class="kn">import</code> <code class="n">KNeighborsRegressor</code>
+<code class="n">model</code> <code class="o">=</code> <code class="n">KNeighborsRegressor</code><code class="p">(</code><code class="n">n_neighbors</code><code class="o">=</code><code class="mi">3</code><code class="p">)</code></pre>
+</div>
+<p>If all went well, your model will make good predictions. If not, you may need to use more attributes (employment rate, health, air pollution, etc.), get more or better-quality training data, or perhaps select a more powerful model (e.g., a polynomial regression model).<a data-primary="" data-startref="ix_linear_regress_ch1" data-type="indexterm" id="idm45983158782544"></a></p>
+<p>In summary:</p>
+<ul>
+<li>
+<p>You studied the data.</p>
+</li>
+<li>
+<p>You selected a model.</p>
+</li>
+<li>
+<p>You trained it on the training data (i.e., the learning algorithm searched for the model parameter values that minimize a cost function).</p>
+</li>
+<li>
+<p>Finally, you applied the model to make predictions on new cases (this is called <em>inference</em>), <a data-primary="inference" data-type="indexterm" id="idm45983157052592"></a>hoping that this model will generalize well.</p>
+</li>
+</ul>
+<p>This is what a typical machine learning project looks like. In <a data-type="xref" href="HOMLWSKT006.xhtml#project_chapter">Chapter 2</a> you will experience this firsthand by going through a project end to end.</p>
+<p>We have covered a lot of ground so far: you now know what machine learning is really about, why it is useful, what some of the most common categories of ML systems are, and what a typical project workflow looks like. Now let’s look at what can go wrong in learning and prevent you from making accurate predictions.<a data-primary="" data-startref="ix_ml_types_sys" data-type="indexterm" id="idm45983157049872"></a><a data-primary="" data-startref="ix_model_base_learn" data-type="indexterm" id="idm45983157048896"></a></p>
+</div>
+</section>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Main Challenges of Machine Learning" data-type="sect1"><div class="sect1" id="idm45983158950064">
+<h2 id="sigil_toc_id_22">Main Challenges of Machine Learning</h2>
+<p><a data-primary="machine learning (ML)" data-secondary="challenges of" data-type="indexterm" id="ix_ml_challenges_ch1"></a>In short, since your main task is to select a model and train it on some data, the two things that can go wrong are “bad model” and “bad data”. Let’s start with examples of bad data.</p>
+<section data-pdf-bookmark="Insufficient Quantity of Training Data" data-type="sect2"><div class="sect2" id="idm45983157045424">
+<h2 id="sigil_toc_id_23" class="sigil_not_in_toc">Insufficient Quantity of Training Data</h2>
+<p><a data-primary="training set" data-secondary="insufficient quantities" data-type="indexterm" id="idm45983157044288"></a>For a toddler to learn what an apple is, all it takes is for you to point to an apple and say “apple” (possibly repeating this procedure a few times). Now the child is able to recognize apples in all sorts of colors and shapes. Genius.</p>
+<p>Machine learning is not quite there yet; it takes a lot of data for most machine learning algorithms to work properly. Even for very simple problems you typically need thousands of examples, and for complex problems such as image or speech recognition you may need millions of examples (unless you can reuse parts of an existing model).</p>
+<aside data-type="sidebar" epub:type="sidebar"><div class="sidebar" id="idm45983157042672">
+<h5 class="sigil_not_in_toc">The Unreasonable Effectiveness of Data</h5>
+<p><a data-primary="data" data-secondary="unreasonable effectiveness" data-type="indexterm" id="idm45983157041264"></a><a data-primary="unreasonable effectiveness of data" data-type="indexterm" id="idm45983157040320"></a>In a <a href="https://homl.info/6">famous paper</a> published in 2001, Microsoft researchers Michele Banko and Eric Brill showed that very different machine learning algorithms, including fairly simple ones, performed almost identically well on a complex problem of natural language disambiguation⁠<sup><a data-type="noteref" href="#idm45983157038864" id="idm45983157038864-marker">6</a></sup> once they were given enough data (as you can see in <a data-type="xref" href="#banko_brill_2001_plot">Figure 1-21</a>).</p>
+<p>As the authors put it, “these results suggest that we may want to reconsider the trade-off between spending time and money on algorithm development versus spending it on corpus development”.</p>
+<p>The idea that data matters more than algorithms for complex problems was further popularized by Peter Norvig et al. in a paper titled <a href="https://homl.info/7">“The Unreasonable Effectiveness of Data”</a>, published in 2009.⁠<sup><a data-type="noteref" href="#idm45983149355376" id="idm45983149355376-marker">7</a></sup>  It should be noted, however, that small and medium-sized datasets are still very common, and it is not always easy or cheap to get extra training data⁠—so don’t abandon algorithms just yet.</p>
+<figure class="smallersixty"><div class="figure" id="banko_brill_2001_plot">
+<img alt="mls3 0121" height="574" src="../Images/mls3_0121.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-21. </span>The importance of data versus algorithms⁠<sup><a data-type="noteref" href="#idm45983149352224" id="idm45983149352224-marker">8</a></sup></h6>
+</div>
+</figure>
+</div>
+</aside>
+</div>
+</section>
+<section data-pdf-bookmark="Nonrepresentative Training Data" data-type="sect2"><div class="sect2" id="idm45983149350864">
+<h2 id="sigil_toc_id_24" class="sigil_not_in_toc">Nonrepresentative Training Data</h2>
+<p>In order to generalize well, it is crucial that your training data be representative of the new cases you want to generalize to. <a data-primary="nonrepresentative training data" data-type="indexterm" id="idm45983149349360"></a><a data-primary="training set" data-secondary="nonrepresentative" data-type="indexterm" id="idm45983149348688"></a>This is true whether you use instance-based learning or model-based learning.</p>
+<p>For example, the set of countries you used earlier for training the linear model was not perfectly representative; it did not contain any country with a GDP per capita lower than $23,500 or higher than $62,500. <a data-type="xref" href="#representative_training_data_scatterplot">Figure 1-22</a> shows what the data looks like when you add such countries.</p>
+<p>If you train a linear model on this data, you get the solid line, while the old model is represented by the dotted line. As you can see, not only does adding a few missing countries significantly alter the model, but it makes it clear that such a simple linear model is probably never going to work well. It seems that very rich countries are not happier than moderately rich countries (in fact, they seem slightly unhappier!), and conversely some poor countries seem happier than many rich countries.</p>
+<p>By using a nonrepresentative training set, you trained a model that is unlikely to make accurate predictions, especially for very poor and very rich countries.</p>
+<figure><div class="figure" id="representative_training_data_scatterplot">
+<img alt="mls3 0122" height="206" src="../Images/mls3_0122.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-22. </span>A more representative training sample</h6>
+</div>
+</figure>
+<p>It is crucial to use a training set that is representative of the cases you want to generalize to. <a data-primary="sampling bias" data-type="indexterm" id="idm45983149343040"></a><a data-primary="sampling noise" data-type="indexterm" id="idm45983149342336"></a>This is often harder than it sounds: if the sample is too small, you will have <em>sampling noise</em> (i.e., nonrepresentative data as a result of chance), but even very large samples can be nonrepresentative if the sampling method is flawed. This is called <em>sampling bias</em>.</p>
+<aside data-type="sidebar" epub:type="sidebar"><div class="sidebar" id="idm45983149340608">
+<h5 class="sigil_not_in_toc">Examples of Sampling Bias</h5>
+<p>Perhaps the most famous example of sampling bias happened during the US presidential election in 1936, which pitted Landon against Roosevelt: the <em>Literary Digest</em> conducted a very large poll, sending mail to about 10 million people. It got 2.4 million answers, and predicted with high confidence that Landon would get 57% of the votes. Instead, Roosevelt won with 62% of the votes. The flaw was in the <em>Literary Digest</em>’s sampling method:</p>
+<ul>
+<li>
+<p>First, to obtain the addresses to send the polls to, the <em>Literary Digest</em> used telephone directories, lists of magazine subscribers, club membership lists, and the like. All of these lists tended to favor wealthier people, who were more likely to vote Republican (hence Landon).</p>
+</li>
+<li>
+<p>Second, less than 25% of the people who were polled answered. Again this introduced a sampling bias, by potentially ruling out people who didn’t care much about politics, people who didn’t like the <em>Literary Digest</em>, and other key groups. <a data-primary="nonresponse bias" data-type="indexterm" id="idm45983149335664"></a>This is a special type of sampling bias called <em>nonresponse bias</em>.</p>
+</li>
+</ul>
+<p>Here is another example: say you want to build a system to recognize funk music videos. One way to build your training set is to search for “funk music” on YouTube and use the resulting videos. But this assumes that YouTube’s search engine returns a set of videos that are representative of all the funk music videos on YouTube. In reality, the search results are likely to be biased toward popular artists (and if you live in Brazil you will get a lot of “funk carioca” videos, which sound nothing like James Brown). On the other hand, how else can you get a large training set?</p>
+</div>
+</aside>
+</div>
+</section>
+<section data-pdf-bookmark="Poor-Quality Data" data-type="sect2"><div class="sect2" id="idm45983149333360">
+<h2 id="sigil_toc_id_25" class="sigil_not_in_toc">Poor-Quality Data</h2>
+<p>Obviously, if your training data is full of errors, outliers, and noise (e.g., due to poor-quality measurements), it will make it harder for the system to detect the underlying patterns, so your system is less likely to perform well. It is often well worth the effort to spend time cleaning up your training data. The truth is, most data scientists spend a significant part of their time doing just that. The following are a couple examples of when you’d want to clean up training data:</p>
+<ul>
+<li>
+<p>If some instances are clearly outliers, it may help to simply discard them or try to fix the errors manually.</p>
+</li>
+<li>
+<p>If some instances are missing a few features (e.g., 5% of your customers did not specify their age), you must decide whether you want to ignore this attribute altogether, ignore these instances, fill in the missing values (e.g., with the median age), or train one model with the feature and one model without it.</p>
+</li>
+</ul>
+</div>
+</section>
+<section data-pdf-bookmark="Irrelevant Features" data-type="sect2"><div class="sect2" id="idm45983149329472">
+<h2 id="sigil_toc_id_26" class="sigil_not_in_toc">Irrelevant Features</h2>
+<p><a data-primary="training set" data-secondary="irrelevant features" data-type="indexterm" id="idm45983149328272"></a>As the saying goes: garbage in, garbage out. Your system will only be capable of learning if the training data contains enough relevant features and not too many irrelevant ones. A critical part of the success of a machine learning project is coming up with a good set of features to train on. <a data-primary="feature extraction" data-type="indexterm" id="idm45983149327168"></a><a data-primary="feature selection" data-type="indexterm" id="idm45983149326496"></a><a data-primary="feature engineering" data-type="indexterm" id="idm45983149325824"></a>This process, called <em>feature engineering</em>, involves the following steps:</p>
+<ul>
+<li>
+<p><em>Feature selection</em> (selecting the most useful features to train on among existing features)</p>
+</li>
+<li>
+<p><em>Feature extraction</em> (combining existing features to produce a more useful one⁠—as we saw earlier, dimensionality reduction algorithms can help)</p>
+</li>
+<li>
+<p>Creating new features by gathering new data</p>
+</li>
+</ul>
+<p>Now that we have looked at many examples of bad data, let’s look at a couple examples of bad algorithms.</p>
+</div>
+</section>
+<section data-pdf-bookmark="Overfitting the Training Data" data-type="sect2"><div class="sect2" id="idm45983149320128">
+<h2 id="sigil_toc_id_27" class="sigil_not_in_toc">Overfitting the Training Data</h2>
+<p><a data-primary="training set" data-secondary="overfitting" data-type="indexterm" id="ix_train_set_overfit_ch1"></a><a data-primary="overfitting of data" data-type="indexterm" id="ix_overfit_data_ch1"></a>Say you are visiting a foreign country and the taxi driver rips you off. You might be tempted to say that <em>all</em> taxi drivers in that country are thieves. Overgeneralizing is something that we humans do all too often, and unfortunately machines can fall into the same trap if we are not careful. In machine learning this is called <em>overfitting</em>: it means that the model performs well on the training data, but it does not generalize well.</p>
+<p><a data-type="xref" href="#overfitting_model_plot">Figure 1-23</a> shows an example of a high-degree polynomial life satisfaction model that strongly overfits the training data. Even though it performs much better on the training data than the simple linear model, would you really trust its predictions?</p>
+<figure><div class="figure" id="overfitting_model_plot">
+<img alt="mls3 0123" height="209" src="../Images/mls3_0123.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-23. </span>Overfitting the training data</h6>
+</div>
+</figure>
+<p>Complex models such as deep neural networks can detect subtle patterns in the data, but if the training set is noisy, or if it is too small, which introduces sampling noise, then the model is likely to detect patterns in the noise itself (as in the taxi driver example). Obviously these patterns will not generalize to new instances. For example, say you feed your life satisfaction model many more attributes, including uninformative ones such as the country’s name. In that case, a complex model may detect patterns like the fact that all countries in the training data with a <em>w</em> in their name have a life satisfaction greater than 7: New Zealand (7.3), Norway (7.6), Sweden (7.3), and Switzerland (7.5). How confident are you that the <em>w</em>-satisfaction rule generalizes to Rwanda or Zimbabwe? Obviously this pattern occurred in the training data by pure chance, but the model has no way to tell whether a pattern is real or simply the result of noise in the data.</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>Overfitting happens when the model is too complex relative to the amount and noisiness of the training data. Here are possible solutions:</p>
+<ul>
+<li>
+<p>Simplify the model by selecting one with fewer parameters (e.g., a linear model rather than a high-degree polynomial model), by reducing the number of attributes in the training data, or by constraining the model.</p>
+</li>
+<li>
+<p>Gather more training data.</p>
+</li>
+<li>
+<p>Reduce the noise in the training data (e.g., fix data errors and remove outliers).</p>
+</li>
+</ul>
+</div>
+<p>Constraining a model to make it simpler and reduce the risk of overfitting is called <em>regularization</em>. For example, the linear model we defined earlier has two parameters, <em>θ</em><sub>0</sub> and <em>θ</em><sub>1</sub>. <a data-primary="degrees of freedom" data-type="indexterm" id="idm45983158442560"></a><a data-primary="regularization" data-type="indexterm" id="idm45983158441824"></a>This gives the learning algorithm two <em>degrees of freedom</em> to adapt the model to the training data: it can tweak both the height (<em>θ</em><sub>0</sub>) and the slope (<em>θ</em><sub>1</sub>) of the line. If we forced <em>θ</em><sub>1</sub> = 0, the algorithm would have only one degree of freedom and would have a much harder time fitting the data properly: all it could do is move the line up or down to get as close as possible to the training instances, so it would end up around the mean. A very simple model indeed! If we allow the algorithm to modify <em>θ</em><sub>1</sub> but we force it to keep it small, then the learning algorithm will effectively have somewhere in between one and two degrees of freedom. It will produce a model that’s simpler than one with two degrees of freedom, but more complex than one with just one. You want to find the right balance between fitting the training data perfectly and keeping the model simple enough to ensure that it will generalize well.</p>
+<p><a data-type="xref" href="#ridge_model_plot">Figure 1-24</a> shows three models. The dotted line represents the original model that was trained on the countries represented as circles (without the countries represented as squares), the solid line is our second model trained with all countries (circles and squares), and the dashed line is a model trained with the same data as the first model but with a regularization constraint. You can see that regularization
+forced the model to have a smaller slope: this model does not fit the training data (circles) as well as the first model, but it actually generalizes better to new examples that it did not see during training (squares).</p>
+<figure><div class="figure" id="ridge_model_plot">
+<img alt="mls3 0124" height="206" src="../Images/mls3_0124.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-24. </span>Regularization reduces the risk of overfitting</h6>
+</div>
+</figure>
+<p><a data-primary="hyperparameters" data-type="indexterm" id="idm45983158434384"></a>The amount of regularization to apply during learning can be controlled by a <em>hyperparameter</em>. A hyperparameter is a parameter of a learning algorithm (not of the model). As such, it is not affected by the learning algorithm itself; it must be set prior to training and remains constant during training. If you set the regularization hyperparameter to a very large value, you will get an almost flat model (a slope close to zero); the learning algorithm will almost certainly not overfit the training data, but it will be less likely to find a good solution. Tuning hyperparameters is an important part of building a machine learning system (you will see a detailed example in the next chapter).<a data-primary="" data-startref="ix_overfit_data_ch1" data-type="indexterm" id="idm45983158433168"></a><a data-primary="" data-startref="ix_train_set_overfit_ch1" data-type="indexterm" id="idm45983158432192"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Underfitting the Training Data" data-type="sect2"><div class="sect2" id="idm45983149319504">
+<h2 id="sigil_toc_id_28" class="sigil_not_in_toc">Underfitting the Training Data</h2>
+<p><a data-primary="training set" data-secondary="underfitting" data-type="indexterm" id="idm45983158430048"></a><a data-primary="underfitting of data" data-type="indexterm" id="idm45983158429072"></a>As you might guess, <em>underfitting</em> is the opposite of overfitting: it occurs when your model is too simple to learn the underlying structure of the data. For example, a linear model of life satisfaction is prone to underfit; reality is just more complex than the model, so its predictions are bound to be inaccurate, even on the training <span class="keep-together">examples</span>.</p>
+<p>Here are the main options for fixing this problem:</p>
+<ul>
+<li>
+<p>Select a more powerful model, with more parameters.</p>
+</li>
+<li>
+<p>Feed better features to the learning algorithm (feature engineering).</p>
+</li>
+<li>
+<p>Reduce the constraints on the model (for example by reducing the regularization 
+<span class="keep-together">hyperparameter).</span></p>
+</li>
+</ul>
+</div>
+</section>
+<section data-pdf-bookmark="Stepping Back" data-type="sect2"><div class="sect2" id="idm45983158422640">
+<h2 id="sigil_toc_id_29" class="sigil_not_in_toc">Stepping Back</h2>
+<p>By now you know a lot about machine learning. However, we went through so many concepts that you may be feeling a little lost, so let’s step back and look at the big <span class="keep-together">picture</span>:</p>
+<ul>
+<li>
+<p>Machine learning is about making machines get better at some task by learning from data, instead of having to explicitly code rules.</p>
+</li>
+<li>
+<p>There are many different types of ML systems: supervised or not, batch or online, instance-based or model-based.</p>
+</li>
+<li>
+<p>In an ML project you gather data in a training set, and you feed the training set to a learning algorithm. If the algorithm is model-based, it tunes some parameters to fit the model to the training set (i.e., to make good predictions on the training set itself), and then hopefully it will be able to make good predictions on new cases as well. If the algorithm is instance-based, it just learns the examples by heart and generalizes to new instances by using a similarity measure to compare them to the learned instances.</p>
+</li>
+<li>
+<p>The system will not perform well if your training set is too small, or if the data is not representative, is noisy, or is polluted with irrelevant features (garbage in, garbage out). Lastly, your model needs to be neither too simple (in which case it will underfit) nor too complex (in which case it will overfit).</p>
+</li>
+</ul>
+<p>There’s just one last important topic to cover: once you have trained a model, you don’t want to just “hope” it generalizes to new cases. You want to evaluate it and fine-tune it if necessary. Let’s see how to do that.<a data-primary="" data-startref="ix_ml_challenges_ch1" data-type="indexterm" id="idm45983158416144"></a></p>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Testing and Validating" data-type="sect1"><div class="sect1" id="idm45983159047568">
+<h2 id="sigil_toc_id_30">Testing and Validating</h2>
+<p><a data-primary="machine learning (ML)" data-secondary="testing and validating" data-type="indexterm" id="ix_ml_test_valid"></a>The only way to know how well a model will generalize to new cases is to actually try it out on new cases. One way to do that is to put your model in production and monitor how well it performs. This works well, but if your model is horribly bad, your users will complain—not the best idea.</p>
+<p><a data-primary="test set" data-type="indexterm" id="idm45983159044416"></a><a data-primary="training set" data-type="indexterm" id="idm45983159043488"></a>A better option is to split your data into two sets: the <em>training set</em> and the <em>test set</em>. <a data-primary="out-of-sample error" data-type="indexterm" id="idm45983159041856"></a><a data-primary="generalization error" data-type="indexterm" id="ix_generalize_error"></a>As these names imply, you train your model using the training set, and you test it using the test set. The error rate on new cases is called the <em>generalization error</em> (or <em>out-of-sample error</em>), and by evaluating your model on the test set, you get an estimate of this error. This value tells you how well your model will perform on instances it has never seen before.</p>
+<p>If the training error is low (i.e., your model makes few mistakes on the training set) but the generalization error is high, it means that your model is overfitting the training data.</p>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p><a data-primary="hold-out sets" data-type="indexterm" id="idm45983159037856"></a>It is common to use 80% of the data for training and <em>hold out</em> 20% for testing. However, this depends on the size of the dataset: if it contains 10 million instances, then holding out 1% means your test set will contain 100,000 instances, probably more than enough to get a good estimate of the generalization error.</p>
+</div>
+<section data-pdf-bookmark="Hyperparameter Tuning and Model Selection" data-type="sect2"><div class="sect2" id="idm45983159036320">
+<h2 id="sigil_toc_id_31" class="sigil_not_in_toc">Hyperparameter Tuning and Model Selection</h2>
+<p><a data-primary="model selection" data-type="indexterm" id="ix_model_select"></a><a data-primary="hyperparameters" data-secondary="tuning of" data-type="indexterm" id="ix_hyperparam_tune_ch1"></a>Evaluating a model is simple enough: just use a test set. But suppose you are hesitating between two types of models (say, a linear model and a polynomial model): how can you decide between them? One option is to train both and compare how well they generalize using the test set.</p>
+<p>Now suppose that the linear model generalizes better, but you want to apply some regularization to avoid overfitting. The question is, how do you choose the value of the regularization hyperparameter? One option is to train 100 different models using 100 different values for this hyperparameter. Suppose you find the best hyperparameter value that produces a model with the lowest generalization error⁠—say, just 5% error. You launch this model into production, but unfortunately it does not perform as well as expected and produces 15% errors. What just happened?</p>
+<p>The problem is that you measured the generalization error multiple times on the test set, and you adapted the model and hyperparameters to produce the best model <em>for that particular set</em>. This means the model is unlikely to perform as well on new data.</p>
+<p><a data-primary="holdout validation" data-type="indexterm" id="idm45983159030736"></a>A common solution to this problem is called <em>holdout validation</em> (<a data-type="xref" href="#hyperparameter_tuning_diagram">Figure 1-25</a>): you simply hold out part of the training set to evaluate several candidate models and select the best one. <a data-primary="development set (dev set)" data-type="indexterm" id="idm45983159028496"></a><a data-primary="validation set" data-type="indexterm" id="idm45983159027856"></a>The new held-out set is called the <em>validation set</em> (or the <em>development set</em>, or <em>dev set</em>). More specifically, you train multiple models with various hyperparameters on the reduced training set (i.e., the full training set minus the validation set), and you select the model that performs best on the validation set. After this holdout validation process, you train the best model on the full training set (including the validation set), and this gives you the final model. Lastly, you evaluate this final model on the test set to get an estimate of the generalization error.</p>
+<figure><div class="figure" id="hyperparameter_tuning_diagram">
+<img alt="mls3 0125" height="298" src="../Images/mls3_0125.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-25. </span>Model selection using holdout validation</h6>
+</div>
+</figure>
+<p>This solution usually works quite well. However, if the validation set is too small, then the model evaluations will be imprecise: you may end up selecting a suboptimal model by mistake. Conversely, if the validation set is too large, then the remaining training set will be much smaller than the full training set. Why is this bad? Well, since the final model will be trained on the full training set, it is not ideal to compare candidate models trained on a much smaller training set. It would be like selecting the fastest sprinter to participate in a marathon. <a data-primary="cross-validation" data-type="indexterm" id="idm45983159023440"></a>One way to solve this problem is to perform repeated <em>cross-validation</em>, using many small validation sets. Each model is evaluated once per validation set after it is trained on the rest of the data. By averaging out all the evaluations of a model, you get a much more accurate measure of its performance. There is a drawback, however: the training time is multiplied by the number of validation sets.<a data-primary="" data-startref="ix_generalize_error" data-type="indexterm" id="idm45983159022160"></a><a data-primary="" data-startref="ix_hyperparam_tune_ch1" data-type="indexterm" id="idm45983159021184"></a><a data-primary="" data-startref="ix_model_select" data-type="indexterm" id="idm45983159020240"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Data Mismatch" data-type="sect2"><div class="sect2" id="idm45983159019168">
+<h2 id="sigil_toc_id_32" class="sigil_not_in_toc">Data Mismatch</h2>
+<p><a data-primary="data mismatch" data-type="indexterm" id="idm45983159017760"></a>In some cases, it’s easy to get a large amount of data for training, but this data probably won’t be perfectly representative of the data that will be used in production. For example, suppose you want to create a mobile app to take pictures of flowers and automatically determine their species. You can easily download millions of pictures of flowers on the web, but they won’t be perfectly representative of the pictures that will actually be taken using the app on a mobile device. Perhaps you only have 1,000 representative pictures (i.e., actually taken with the app).</p>
+<p>In this case, the most important rule to remember is that both the validation set and the test set must be as representative as possible of the data you expect to use in production, so they should be composed exclusively of representative pictures: you can shuffle them and put half in the validation set and half in the test set (making sure that no duplicates or near-duplicates end up in both sets). After training your model on the web pictures, if you observe that the performance of the model on the validation set is disappointing, you will not know whether this is because your model has overfit the training set, or whether this is just due to the mismatch between the web pictures and the mobile app pictures.</p>
+<p>One solution is to hold out some of the training pictures (from the web) in yet another set that Andrew Ng dubbed the <em>train-dev set</em> (<a data-type="xref" href="#train_dev_diagram">Figure 1-26</a>). <a data-primary="train-dev set" data-type="indexterm" id="idm45983159014720"></a>After the model is trained (on the training set, <em>not</em> on the train-dev set), you can evaluate it on the train-dev set. If the model performs poorly, then it must have overfit the training set, so you should try to simplify or regularize the model, get more training data, and clean up the training data. But if it performs well on the train-dev set, then you can evaluate the model on the dev set. If it performs poorly, then the problem must be coming from the data mismatch. You can try to tackle this problem by preprocessing the web images to make them look more like the pictures that will be taken by the mobile app, and then retraining the model. Once you have a model that performs well on both the train-dev set and the dev set, you can evaluate it one last time on the test set to know how well it is likely to perform in production.</p>
+<figure><div class="figure" id="train_dev_diagram">
+<img alt="mls3 0126" height="151" src="../Images/mls3_0126.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 1-26. </span>When real data is scarce (right), you may use similar abundant data (left) for training and hold out some of it in a train-dev set to evaluate overfitting; the real data is then used to evaluate data mismatch (dev set) and to evaluate the final model’s performance (test set)</h6>
+</div>
+</figure>
+<aside class="less_space pagebreak-before" data-type="sidebar" epub:type="sidebar"><div class="sidebar" id="idm45983159011408">
+<h5 class="sigil_not_in_toc">No Free Lunch Theorem</h5>
+<p><a data-primary="No Free Lunch theorem" data-type="indexterm" id="idm45983159009968"></a>A model is a simplified representation of the data. The simplifications are meant to discard the superfluous details that are unlikely to generalize to new instances. <a data-primary="assumptions, checking in model building" data-type="indexterm" id="idm45983159009136"></a><a data-primary="data" data-secondary="making assumptions about" data-type="indexterm" id="idm45983159008448"></a>When you select a particular type of model, you are implicitly making <em>assumptions</em> about the data. For example, if you choose a linear model, you are implicitly assuming that the data is fundamentally linear and that the distance between the instances and the straight line is just noise, which can safely be ignored.</p>
+<p>In a <a href="https://homl.info/8">famous 1996 paper</a>,⁠<sup><a data-type="noteref" href="#idm45983157544720" id="idm45983157544720-marker">9</a></sup> David Wolpert demonstrated that if you make absolutely no assumption about the data, then there is no reason to prefer one model over any other. This is called the <em>No Free Lunch</em> (NFL) theorem. For some datasets the best model is a linear model, while for other datasets it is a neural network. There is no model that is <em>a priori</em> guaranteed to work better (hence the name of the theorem). The only way to know for sure which model is best is to evaluate them all. Since this is not possible, in practice you make some reasonable assumptions about the data and evaluate only a few reasonable models. For example, for simple tasks you may evaluate linear models with various levels of regularization, and for a complex problem you may evaluate various neural networks.<a data-primary="" data-startref="ix_ml_test_valid" data-type="indexterm" id="idm45983157542784"></a></p>
+</div>
+</aside>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Exercises" data-type="sect1"><div class="sect1" id="idm45983157541296">
+<h2 id="sigil_toc_id_33">Exercises</h2>
+<p>In this chapter we have covered some of the most important concepts in machine learning. In the next chapters we will dive deeper and write more code, but before we do, make sure you can answer the following questions:</p>
+<ol>
+<li>
+<p>How would you define machine learning?</p>
+</li>
+<li>
+<p>Can you name four types of applications where it shines?</p>
+</li>
+<li>
+<p>What is a labeled training set?</p>
+</li>
+<li>
+<p>What are the two most common supervised tasks?</p>
+</li>
+<li>
+<p>Can you name four common unsupervised tasks?</p>
+</li>
+<li>
+<p>What type of algorithm would you use to allow a robot to walk in various unknown terrains?</p>
+</li>
+<li>
+<p>What type of algorithm would you use to segment your customers into multiple groups?</p>
+</li>
+<li>
+<p>Would you frame the problem of spam detection as a supervised learning problem or an unsupervised learning problem?</p>
+</li>
+<li>
+<p>What is an online learning system?</p>
+</li>
+<li>
+<p>What is out-of-core learning?</p>
+</li>
+<li>
+<p>What type of algorithm relies on a similarity measure to make predictions?</p>
+</li>
+<li>
+<p>What is the difference between a model parameter and a model hyperparameter?</p>
+</li>
+<li>
+<p>What do model-based algorithms search for? What is the most common strategy they use to succeed? How do they make predictions?</p>
+</li>
+<li>
+<p>Can you name four of the main challenges in machine learning?</p>
+</li>
+<li>
+<p>If your model performs great on the training data but generalizes poorly to new instances, what is happening? Can you name three possible solutions?</p>
+</li>
+<li>
+<p>What is a test set, and why would you want to use it?</p>
+</li>
+<li>
+<p>What is the purpose of a validation set?</p>
+</li>
+<li>
+<p>What is the train-dev set, when do you need it, and how do you use it?</p>
+</li>
+<li>
+<p>What can go wrong if you tune hyperparameters using the test set?</p>
+</li>
+</ol>
+<p>Solutions to these exercises are available at the end of this chapter’s notebook, at <a href="https://homl.info/colab3"><em class="hyperlink">https://homl.info/colab3</em></a>.</p>
+</div>
+</section>
+<div data-type="footnotes"><p data-type="footnote" id="idm45983158170336"><sup><a href="#idm45983158170336-marker">1</a></sup> Fun fact: this odd-sounding name is a statistics term introduced by Francis Galton while he was studying the fact that the children of tall people tend to be shorter than their parents. <a data-primary="regression to the mean" data-type="indexterm" id="idm45983158169568"></a>Since the children were shorter, he called this <em>regression to the mean</em>. This name was then applied to the methods he used to analyze correlations between variables.</p>
+<p data-type="footnote" id="idm45983158566032"><sup><a href="#idm45983158566032-marker">2</a></sup> Notice how animals are rather well separated from vehicles and how horses are close to deer but far from birds. Figure reproduced with permission from Richard Socher et al., “Zero-Shot Learning Through Cross-Modal Transfer”, <em>Proceedings of the 26th International Conference on Neural Information Processing Systems</em> 1 (2013): 935–943.</p>
+<p data-type="footnote" id="idm45983158717360"><sup><a href="#idm45983158717360-marker">3</a></sup> That’s when the system works perfectly. In practice it often creates a few clusters per person, and sometimes mixes up two people who look alike, so you may need to provide a few labels per person and manually clean up some clusters.</p>
+<p data-type="footnote" id="idm45983158299520"><sup><a href="#idm45983158299520-marker">4</a></sup> By convention, the Greek letter <em>θ</em> (theta) is frequently used to represent model parameters.</p>
+<p data-type="footnote" id="idm45983158408048"><sup><a href="#idm45983158408048-marker">5</a></sup> It’s OK if you don’t understand all the code yet; I will present Scikit-Learn in the following chapters.</p>
+<p data-type="footnote" id="idm45983157038864"><sup><a href="#idm45983157038864-marker">6</a></sup> For example, knowing whether to write “to”, “two”, or “too”, depending on the context.</p>
+<p data-type="footnote" id="idm45983149355376"><sup><a href="#idm45983149355376-marker">7</a></sup> Peter Norvig et al., “The Unreasonable Effectiveness of Data”, <em>IEEE Intelligent Systems</em> 24, no. 2 (2009): 8–12.</p>
+<p data-type="footnote" id="idm45983149352224"><sup><a href="#idm45983149352224-marker">8</a></sup> Figure reproduced with permission from Michele Banko and Eric Brill, “Scaling to Very Very Large Corpora for Natural Language Disambiguation”, <em>Proceedings of the 39th Annual Meeting of the Association for Computational Linguistics</em> (2001): 26–33.</p>
+<p data-type="footnote" id="idm45983157544720"><sup><a href="#idm45983157544720-marker">9</a></sup> David Wolpert, “The Lack of A Priori Distinctions Between Learning Algorithms”, <em>Neural Computation</em> 8, no. 7 (1996): 1341–1390.</p>
+</div>
+</div>
+</section>
+</div>
+</body>
+</html>

@@ -1,0 +1,581 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+<title>8. Dimensionality Reduction</title>
+<link href="../Styles/epub.css" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+<div id="sbo-rt-content"><section data-pdf-bookmark="Chapter 8. Dimensionality Reduction" data-type="chapter" epub:type="chapter"><div class="chapter" id="dimensionality_chapter">
+<h1><span class="label">Chapter 8. </span>Dimensionality Reduction</h1>
+<p>Many machine learning problems involve thousands or even millions of features for each training instance. <a data-primary="dimensionality reduction" data-type="indexterm" id="ix_dimension_reduct_ch8"></a>Not only do all these features make training extremely slow, but they can also make it much harder to find a good solution, as you will see. This problem is often referred to as the <em>curse of dimensionality</em>.</p>
+<p>Fortunately, in real-world problems, it is often possible to reduce the number of features considerably, turning an intractable problem into a tractable one. For example, consider the MNIST images (introduced in <a data-type="xref" href="HOMLWSKT007.xhtml#classification_chapter">Chapter 3</a>): the pixels on the image borders are almost always white, so you could completely drop these pixels from the training set without losing much information. <a data-primary="dimensionality reduction" data-secondary="information loss from" data-type="indexterm" id="idm45983115576928"></a>As we saw in the previous chapter, (<a data-type="xref" href="HOMLWSKT011.xhtml#mnist_feature_importance_plot">Figure 7-6</a>) confirms that these pixels are utterly unimportant for the classification task. Additionally, two neighboring pixels are often highly correlated: if you merge them into a single pixel (e.g., by taking the mean of the two pixel intensities), you will not lose much information.</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>Reducing dimensionality does cause some information loss, just like compressing an image to JPEG can degrade its quality, so even though it will speed up training, it may make your system perform slightly worse. It also makes your pipelines a bit more complex and thus harder to maintain. Therefore, I recommend you first try to train your system with the original data before considering using dimensionality reduction. In some cases, reducing the dimensionality of the training data may filter out some noise and unnecessary details and thus result in higher performance, but in general it won’t; it will just speed up training.</p>
+</div>
+<p class="pagebreak-before">Apart from speeding up training, dimensionality reduction is also extremely useful for data visualization. <a data-primary="dimensionality reduction" data-secondary="for data visualization" data-secondary-sortas="data visualization" data-type="indexterm" id="idm45983115572912"></a><a data-primary="visualization of data" data-secondary="dimensionality reduction" data-type="indexterm" id="idm45983115571696"></a>Reducing the number of dimensions down to two (or three) makes it possible to plot a condensed view of a high-dimensional training set on a graph and often gain some important insights by visually detecting patterns, such as clusters. Moreover, data visualization is essential to communicate your conclusions to people who are not data scientists—in particular, decision makers who will use your results.</p>
+<p>In this chapter we will first discuss the curse of dimensionality and get a sense of what goes on in high-dimensional space. Then we will consider the two main approaches to dimensionality reduction (projection and manifold learning), and we will go through three of the most popular dimensionality reduction techniques: PCA, random projection, and locally linear embedding (LLE).</p>
+<section data-pdf-bookmark="The Curse of Dimensionality" data-type="sect1"><div class="sect1" id="idm45983115570144">
+<h2 id="sigil_toc_id_139">The Curse of Dimensionality</h2>
+<p>We are so used to living in three dimensions⁠<sup><a data-type="noteref" href="#idm45983115568432" id="idm45983115568432-marker">1</a></sup> that our intuition fails us when we try to imagine a high-dimensional space. <a data-primary="dimensionality reduction" data-secondary="curse of dimensionality" data-type="indexterm" id="ix_dim_reduct_curse"></a>Even a basic 4D hypercube is incredibly hard to picture in our minds (see <a data-type="xref" href="#hypercube_wikipedia">Figure 8-1</a>), let alone a 200-dimensional ellipsoid bent in a 1,000-dimensional space.</p>
+<figure><div class="figure" id="hypercube_wikipedia">
+<img alt="mls3 0801" height="198" src="../Images/mls3_0801.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-1. </span>Point, segment, square, cube, and tesseract (0D to 4D hypercubes)⁠<sup><a data-type="noteref" href="#idm45983115563584" id="idm45983115563584-marker">2</a></sup></h6>
+</div>
+</figure>
+<p>It turns out that many things behave very differently in high-dimensional space. For example, if you pick a random point in a unit square (a 1 × 1 square), it will have only about a 0.4% chance of being located less than 0.001 from a border (in other words, it is very unlikely that a random point will be “extreme” along any dimension). But in a 10,000-dimensional unit hypercube, this probability is greater than 99.999999%. Most points in a high-dimensional hypercube are very close to the border.⁠<sup><a data-type="noteref" href="#idm45983115559056" id="idm45983115559056-marker">3</a></sup></p>
+<p>Here is a more troublesome difference: if you pick two points randomly in a unit square, the distance between these two points will be, on average, roughly 0.52. If you pick two random points in a 3D unit cube, the average distance will be roughly 0.66. But what about two points picked randomly in a 1,000,000-dimensional unit hypercube? The average distance, believe it or not, will be about 408.25 (roughly <math xmlns="http://www.w3.org/1998/Math/MathML"><msqrt><mfrac bevelled="true"><mrow><mn>1</mn><mo>,</mo><mn>000</mn><mo>,</mo><mn>000</mn></mrow><mn>6</mn></mfrac></msqrt></math>)! This is counterintuitive: how can two points be so far apart when they both lie within the same unit hypercube? Well, there’s just plenty of space in high dimensions. As a result, high-dimensional datasets are at risk of being very sparse: most training instances are likely to be far away from each other. This also means that a new instance will likely be far away from any training instance, making predictions much less reliable than in lower dimensions, since they will be based on much larger extrapolations. In short, the more dimensions the training set has, the greater the risk of overfitting it.</p>
+<p>In theory, one solution to the curse of dimensionality could be to increase the size of the training set to reach a sufficient density of training instances. Unfortunately, in practice, the number of training instances required to reach a given density grows exponentially with the number of dimensions. With just 100 features—significantly fewer than in the MNIST problem—all ranging from 0 to 1, you would need more training instances than atoms in the observable universe in order for training instances to be within 0.1 of each other on average, assuming they were spread out uniformly across all dimensions.<a data-primary="" data-startref="ix_dim_reduct_curse" data-type="indexterm" id="idm45983115554880"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Main Approaches for Dimensionality Reduction" data-type="sect1"><div class="sect1" id="idm45983115553712">
+<h2 id="sigil_toc_id_140">Main Approaches for Dimensionality Reduction</h2>
+<p>Before we dive into specific dimensionality reduction algorithms, let’s take a look at the two main approaches to reducing dimensionality: projection and manifold learning.<a data-primary="dimensionality reduction" data-secondary="approaches to" data-type="indexterm" id="ix_dim_reduct_approach"></a></p>
+<section data-pdf-bookmark="Projection" data-type="sect2"><div class="sect2" id="idm45983115550752">
+<h2 id="sigil_toc_id_141" class="sigil_not_in_toc">Projection</h2>
+<p>In most real-world problems, training instances are <em>not</em> spread out uniformly across all dimensions. <a data-primary="projection, dimensionality reduction" data-type="indexterm" id="ix_project_dim_reduct"></a>Many features are almost constant, while others are highly correlated (as discussed earlier for MNIST). As a result, all training instances lie within (or close to) a much lower-dimensional <em>subspace</em> of the high-dimensional space. This sounds very abstract, so let’s look at an example. In <a data-type="xref" href="#dataset_3d_plot">Figure 8-2</a> you can see a 3D dataset represented by small spheres.</p>
+<figure class="smallerseventyfive"><div class="figure" id="dataset_3d_plot">
+<img alt="mls3 0802" height="527" src="../Images/mls3_0802.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-2. </span>A 3D dataset lying close to a 2D subspace</h6>
+</div>
+</figure>
+<p>Notice that all training instances lie close to a plane: this is a lower-dimensional (2D) subspace of the higher-dimensional (3D) space. If we project every training instance perpendicularly onto this subspace (as represented by the short dashed lines connecting the instances to the plane), we get the new 2D dataset shown in <a data-type="xref" href="#dataset_2d_plot">Figure 8-3</a>. Ta-da! We have just reduced the dataset’s dimensionality from 3D to 2D.<a data-primary="" data-startref="ix_project_dim_reduct" data-type="indexterm" id="idm45983115542480"></a> Note that the axes correspond to new features <em>z</em><sub>1</sub> and <em>z</em><sub>2</sub>: they are the coordinates of the projections on the plane.</p>
+<figure class="smallersixty"><div class="figure" id="dataset_2d_plot">
+<img alt="mls3 0803" height="360" src="../Images/mls3_0803.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-3. </span>The new 2D dataset after projection</h6>
+</div>
+</figure>
+</div>
+</section>
+<section data-pdf-bookmark="Manifold Learning" data-type="sect2"><div class="sect2" id="idm45983115537696">
+<h2 id="sigil_toc_id_142" class="sigil_not_in_toc">Manifold Learning</h2>
+<p>However, projection<a data-primary="manifold learning, dimension reduction" data-type="indexterm" id="ix_manifold_dim_reduct"></a> is not always the best approach to dimensionality reduction. <a data-primary="Swiss roll dataset" data-type="indexterm" id="ix_swiss_roll"></a>In many cases the subspace may twist and turn, such as in the famous Swiss roll toy dataset represented in <a data-type="xref" href="#swiss_roll_plot">Figure 8-4</a>.</p>
+<figure class="smallerseventyfive"><div class="figure" id="swiss_roll_plot">
+<img alt="mls3 0804" height="443" src="../Images/mls3_0804.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-4. </span>Swiss roll dataset</h6>
+</div>
+</figure>
+<p>Simply projecting onto a plane (e.g., by dropping <em>x</em><sub>3</sub>) would squash different layers of the Swiss roll together, as shown on the left side of <a data-type="xref" href="#squished_swiss_roll_plot">Figure 8-5</a>. What you probably want instead is to unroll the Swiss roll to obtain the 2D dataset on the right side of <a data-type="xref" href="#squished_swiss_roll_plot">Figure 8-5</a>.</p>
+<figure><div class="figure" id="squished_swiss_roll_plot">
+<img alt="mls3 0805" height="227" src="../Images/mls3_0805.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-5. </span>Squashing by projecting onto a plane (left) versus unrolling the Swiss roll (right)</h6>
+</div>
+</figure>
+<p>The Swiss roll is an example of a 2D <em>manifold</em>. Put simply, a 2D manifold is a 2D shape that can be bent and twisted in a higher-dimensional space. More generally, a <em>d</em>-dimensional manifold is a part of an <em>n</em>-dimensional space (where <em>d</em> &lt; <em>n</em>) that locally resembles a <em>d</em>-dimensional hyperplane. In the case of the Swiss roll, <em>d</em> = 2 and <em>n</em> = 3: it locally resembles a 2D plane, but it is rolled in the third dimension.<a data-primary="" data-startref="ix_swiss_roll" data-type="indexterm" id="idm45983115521168"></a></p>
+<p>Many dimensionality reduction algorithms work by modeling the manifold on which the training instances lie; this is called <em>manifold learning</em>. It relies on the <em>manifold assumption</em>, also called the <em>manifold hypothesis</em>, which holds that most real-world high-dimensional datasets lie close to a much lower-dimensional manifold. <a data-primary="manifold hypothesis" data-type="indexterm" id="idm45983115518496"></a>This assumption is very often empirically observed.</p>
+<p>Once again, think about the MNIST dataset: all handwritten digit images have some similarities. They are made of connected lines, the borders are white, and they are more or less centered. If you randomly generated images, only a ridiculously tiny fraction of them would look like handwritten digits. In other words, the degrees of freedom available to you if you try to create a digit image are dramatically lower than the degrees of freedom you have if you are allowed to generate any image you want. These constraints tend to squeeze the dataset into a lower-dimensional manifold.</p>
+<p>The manifold assumption is often accompanied by another implicit assumption: that the task at hand (e.g., classification or regression) will be simpler if expressed in the lower-dimensional space of the manifold. For example, in the top row of <a data-type="xref" href="#manifold_decision_boundary_plot">Figure 8-6</a> the Swiss roll is split into two classes: in the 3D space (on the left) the decision boundary would be fairly complex, but in the 2D unrolled manifold space (on the right) the decision boundary is a straight line.</p>
+<p>However, this implicit assumption does not always hold. For example, in the bottom row of <a data-type="xref" href="#manifold_decision_boundary_plot">Figure 8-6</a>, the decision boundary is located at <em>x</em><sub>1</sub> = 5. This decision boundary looks very simple in the original 3D space (a vertical plane), but it looks more complex in the unrolled manifold (a collection of four independent line segments).</p>
+<p>In short, reducing the dimensionality of your training set before training a model will usually speed up training, but it may not always lead to a better or simpler solution; it all depends on the dataset.<a data-primary="" data-startref="ix_dim_reduct_approach" data-type="indexterm" id="idm45983115513072"></a><a data-primary="" data-startref="ix_manifold_dim_reduct" data-type="indexterm" id="idm45983115512096"></a></p>
+<p>Hopefully you now have a good sense of what the curse of dimensionality is and how dimensionality reduction algorithms can fight it, especially when the manifold assumption holds. The rest of this chapter will go through some of the most popular algorithms for dimensionality reduction.</p>
+<figure><div class="figure" id="manifold_decision_boundary_plot">
+<img alt="mls3 0806" height="437" src="../Images/mls3_0806.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-6. </span>The decision boundary may not always be simpler with lower dimensions</h6>
+</div>
+</figure>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="PCA" data-type="sect1"><div class="sect1" id="idm45983115508608">
+<h2 id="sigil_toc_id_143">PCA</h2>
+<p><em>Principal component analysis</em> (PCA) is by far the most popular dimensionality reduction algorithm. <a data-primary="principal component analysis (PCA)" data-type="indexterm" id="ix_princ_comp_anal_pca"></a>First it identifies the hyperplane that lies closest to the data, and then it projects the data onto it, just like in <a data-type="xref" href="#dataset_3d_plot">Figure 8-2</a>.</p>
+<section data-pdf-bookmark="Preserving the Variance" data-type="sect2"><div class="sect2" id="idm45983115504544">
+<h2 id="sigil_toc_id_144" class="sigil_not_in_toc">Preserving the Variance</h2>
+<p>Before you can project the training set onto a lower-dimensional hyperplane, you first need to choose the right hyperplane. <a data-primary="principal component analysis (PCA)" data-secondary="preserving variance" data-type="indexterm" id="idm45983115503216"></a><a data-primary="variance" data-secondary="preserving" data-type="indexterm" id="idm45983115502224"></a>For example, a simple 2D dataset is represented on the left in <a data-type="xref" href="#pca_best_projection_plot">Figure 8-7</a>, along with three different axes (i.e., 1D hyperplanes). On the right is the result of the projection of the dataset onto each of these axes. As you can see, the projection onto the solid line preserves the maximum variance (top), while the projection onto the dotted line preserves very little variance (bottom) and the projection onto the dashed line preserves an intermediate amount of variance (middle).</p>
+<figure><div class="figure" id="pca_best_projection_plot">
+<img alt="mls3 0807" height="285" src="../Images/mls3_0807.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-7. </span>Selecting the subspace on which to project</h6>
+</div>
+</figure>
+<p>It seems reasonable to select the axis that preserves the maximum amount of variance, as it will most likely lose less information than the other projections. Another way to justify this choice is that it is the axis that minimizes the mean squared distance between the original dataset and its projection onto that axis. This is the rather simple idea behind <a class="orm:hideurl" href="https://homl.info/pca">PCA</a>.⁠<sup><a data-type="noteref" href="#idm45983115496944" id="idm45983115496944-marker">4</a></sup></p>
+</div>
+</section>
+<section data-pdf-bookmark="Principal Components" data-type="sect2"><div class="sect2" id="idm45983115495488">
+<h2 id="sigil_toc_id_145" class="sigil_not_in_toc">Principal Components</h2>
+<p>PCA identifies the axis that accounts for the largest amount of variance in the training set. In <a data-type="xref" href="#pca_best_projection_plot">Figure 8-7</a>, it is the solid line. It also finds a second axis, orthogonal to the first one, that accounts for the largest amount of the remaining variance. In this 2D example there is no choice: it is the dotted line. If it were a higher-dimensional dataset, PCA would also find a third axis, orthogonal to both previous axes, and a fourth, a fifth, and so on—as many axes as the number of dimensions in the dataset.</p>
+<p>The <em>i</em><sup>th</sup> axis is called the <em>i</em><sup>th</sup> <em>principal component</em> (PC) of the data. <a data-primary="principal component (PC)" data-type="indexterm" id="ix_princ_comp_pc"></a>In <a data-type="xref" href="#pca_best_projection_plot">Figure 8-7</a>, the first PC is the axis on which vector <strong>c</strong><sub><strong>1</strong></sub> lies, and the second PC is the axis on which vector <strong>c</strong><sub><strong>2</strong></sub> lies. In <a data-type="xref" href="#dataset_3d_plot">Figure 8-2</a> the first two PCs are on the projection plane, and the third PC is the axis orthogonal to that plane. After the projection, in <a data-type="xref" href="#dataset_2d_plot">Figure 8-3</a>, the first PC corresponds to the <em>z</em><sub>1</sub> axis, and the second PC corresponds to the <em>z</em><sub>2</sub> axis.</p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>For each principal component, PCA finds a zero-centered unit vector pointing in the direction of the PC. Since two opposing unit vectors lie on the same axis, the direction of the unit vectors returned by PCA is not stable: if you perturb the training set slightly and run PCA again, the unit vectors may point in the opposite direction as the original vectors. However, they will generally still lie on the same axes. In some cases, a pair of unit vectors may even rotate or swap (if the variances along these two axes are very close), but the plane they define will generally remain the same.</p>
+</div>
+<p>So how can you find the principal components of a training set? <a data-primary="principal component analysis (PCA)" data-secondary="finding principal components" data-type="indexterm" id="idm45983115482016"></a><a data-primary="singular value decomposition (SVD)" data-type="indexterm" id="idm45983115480976"></a><a data-primary="SVD (singular value decomposition)" data-type="indexterm" id="idm45983115480288"></a>Luckily, there is a standard matrix factorization technique called <em>singular value decomposition</em> (SVD) that can decompose the training set matrix <strong>X</strong> into the matrix multiplication of three matrices <strong>U</strong> <strong>Σ</strong> <strong>V</strong><sup>⊺</sup>, where <strong>V</strong> contains the unit vectors that define all the principal components that you are looking for, as shown in <a data-type="xref" href="#principal_components_matrix">Equation 8-1</a>.</p>
+<div class="fifty-percent" data-type="equation" id="principal_components_matrix"><h5 class="sigil_not_in_toc"><span class="label">Equation 8-1. </span>Principal components matrix</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mrow>
+<mi mathvariant="bold">V</mi>
+<mo>=</mo>
+<mfenced close=")" open="(">
+<mtable>
+<mtr>
+<mtd>
+<mo>∣</mo>
+</mtd>
+<mtd>
+<mo>∣</mo>
+</mtd>
+<mtd/>
+<mtd>
+<mo>∣</mo>
+</mtd>
+</mtr>
+<mtr>
+<mtd>
+<msub><mi mathvariant="bold">c</mi> <mn>1</mn> </msub>
+</mtd>
+<mtd>
+<msub><mi mathvariant="bold">c</mi> <mn>2</mn> </msub>
+</mtd>
+<mtd>
+<mo>⋯</mo>
+</mtd>
+<mtd>
+<msub><mi mathvariant="bold">c</mi> <mi mathvariant="italic">n</mi> </msub>
+</mtd>
+</mtr>
+<mtr>
+<mtd>
+<mo>∣</mo>
+</mtd>
+<mtd>
+<mo>∣</mo>
+</mtd>
+<mtd/>
+<mtd>
+<mo>∣</mo>
+</mtd>
+</mtr>
+</mtable>
+</mfenced>
+</mrow>
+</math>
+</div>
+<p>The following Python code uses NumPy’s <code>svd()</code> function to obtain all the principal components of the 3D training set represented in <a data-type="xref" href="#dataset_3d_plot">Figure 8-2</a>, then it extracts the two unit vectors that define the first two PCs:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">import</code> <code class="nn">numpy</code> <code class="k">as</code> <code class="nn">np</code>
+
+<code class="n">X</code> <code class="o">=</code> <code class="p">[</code><code class="o">...</code><code class="p">]</code>  <code class="c1"># create a small 3D dataset</code>
+<code class="n">X_centered</code> <code class="o">=</code> <code class="n">X</code> <code class="o">-</code> <code class="n">X</code><code class="o">.</code><code class="n">mean</code><code class="p">(</code><code class="n">axis</code><code class="o">=</code><code class="mi">0</code><code class="p">)</code>
+<code class="n">U</code><code class="p">,</code> <code class="n">s</code><code class="p">,</code> <code class="n">Vt</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">linalg</code><code class="o">.</code><code class="n">svd</code><code class="p">(</code><code class="n">X_centered</code><code class="p">)</code>
+<code class="n">c1</code> <code class="o">=</code> <code class="n">Vt</code><code class="p">[</code><code class="mi">0</code><code class="p">]</code>
+<code class="n">c2</code> <code class="o">=</code> <code class="n">Vt</code><code class="p">[</code><code class="mi">1</code><code class="p">]</code></pre>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>PCA assumes that the dataset is centered around the origin. As you will see, Scikit-Learn’s PCA classes take care of centering the data for you. If you implement PCA yourself (as in the preceding example), or if you use other libraries, don’t forget to center the data first.<a data-primary="" data-startref="ix_princ_comp_pc" data-type="indexterm" id="idm45983115381712"></a></p>
+</div>
+</div>
+</section>
+<section data-pdf-bookmark="Projecting Down to d Dimensions" data-type="sect2"><div class="sect2" id="idm45983115380544">
+<h2 id="sigil_toc_id_146" class="sigil_not_in_toc">Projecting Down to d Dimensions</h2>
+<p>Once<a data-primary="principal component analysis (PCA)" data-secondary="projecting down to d dimensions" data-type="indexterm" id="idm45983115378816"></a> you have identified all the principal components, you can reduce the dimensionality of the dataset down to <em>d</em> dimensions by projecting it onto the hyperplane defined by the first <em>d</em> principal components. Selecting this hyperplane ensures that the projection will preserve as much variance as possible. For example, in <a data-type="xref" href="#dataset_3d_plot">Figure 8-2</a> the 3D dataset is projected down to the 2D plane defined by the first two principal <span class="keep-together">components</span>, preserving a large part of the dataset’s variance. As a result, the 2D projection looks very much like the original 3D dataset.</p>
+<p>To project the training set onto the hyperplane and obtain a reduced dataset <strong>X</strong><sub><em>d</em>-proj</sub> of dimensionality <em>d</em>, compute the matrix multiplication of the training set matrix <strong>X</strong> by the matrix <strong>W</strong><sub><em>d</em></sub>, defined as the matrix containing the first <em>d</em> columns of <strong>V</strong>, as shown in <a data-type="xref" href="#pca_projection">Equation 8-2</a>.</p>
+<div class="fifty-percent" data-type="equation" id="pca_projection"><h5 class="sigil_not_in_toc"><span class="label">Equation 8-2. </span>Projecting the training set down to <em>d</em> dimensions</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mrow>
+<msub><mi mathvariant="bold">X</mi> <mrow><mi>d</mi><mtext>-proj</mtext></mrow> </msub>
+<mo>=</mo>
+<mi mathvariant="bold">X</mi>
+<msub><mi mathvariant="bold">W</mi> <mi>d</mi> </msub>
+</mrow>
+</math>
+</div>
+<p>The following Python code projects the training set onto the plane defined by the first two principal components:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">W2</code> <code class="o">=</code> <code class="n">Vt</code><code class="p">[:</code><code class="mi">2</code><code class="p">]</code><code class="o">.</code><code class="n">T</code>
+<code class="n">X2D</code> <code class="o">=</code> <code class="n">X_centered</code> <code class="o">@</code> <code class="n">W2</code></pre>
+<p>There you have it! You now know how to reduce the dimensionality of any dataset by projecting it down to any number of dimensions, while preserving as much variance as possible.</p>
+</div>
+</section>
+<section data-pdf-bookmark="Using Scikit-Learn" data-type="sect2"><div class="sect2" id="idm45983115324960">
+<h2 id="sigil_toc_id_147" class="sigil_not_in_toc">Using Scikit-Learn</h2>
+<p>Scikit-Learn’s <code>PCA</code> class uses SVD to implement PCA, just like we did earlier in this chapter. <a data-primary="Scikit-Learn" data-secondary="sklearn.decomposition.PCA" data-type="indexterm" id="idm45983115323344"></a><a data-primary="principal component analysis (PCA)" data-secondary="using Scikit_Learn for" data-type="indexterm" id="idm45983115322400"></a><a data-primary="Scikit-Learn" data-secondary="PCA implementation" data-type="indexterm" id="idm45983115321488"></a>The following code applies PCA to reduce the dimensionality of the dataset down to two dimensions (note that it automatically takes care of centering the data):</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.decomposition</code> <code class="kn">import</code> <code class="n">PCA</code>
+
+<code class="n">pca</code> <code class="o">=</code> <code class="n">PCA</code><code class="p">(</code><code class="n">n_components</code><code class="o">=</code><code class="mi">2</code><code class="p">)</code>
+<code class="n">X2D</code> <code class="o">=</code> <code class="n">pca</code><code class="o">.</code><code class="n">fit_transform</code><code class="p">(</code><code class="n">X</code><code class="p">)</code></pre>
+<p>After fitting the <code>PCA</code> transformer to the dataset, its <code>components_</code> attribute holds the transpose of <strong>W</strong><sub><em>d</em></sub>: it contains one row for each of the first <em>d</em> principal components.</p>
+</div>
+</section>
+<section data-pdf-bookmark="Explained Variance Ratio" data-type="sect2"><div class="sect2" id="idm45983115276928">
+<h2 id="sigil_toc_id_148" class="sigil_not_in_toc">Explained Variance Ratio</h2>
+<p>Another useful piece of information is the <em>explained variance ratio</em> of each principal component, available via the <code>explained_variance_ratio_</code> variable. <a data-primary="principal component analysis (PCA)" data-secondary="explained variance ratio" data-type="indexterm" id="idm45983115274576"></a><a data-primary="explained variance ratio" data-type="indexterm" id="idm45983115273664"></a><a data-primary="variance" data-secondary="explained" data-type="indexterm" id="ix_variance_ex"></a>The ratio indicates the proportion of the dataset’s variance that lies along each principal component. For example, let’s look at the explained variance ratios of the first two components of the 3D dataset represented in <a data-type="xref" href="#dataset_3d_plot">Figure 8-2</a>:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">pca</code><code class="o">.</code><code class="n">explained_variance_ratio_</code>
+<code class="go">array([0.7578477 , 0.15186921])</code></pre>
+<p>This output tells us that about 76% of the dataset’s variance lies along the first PC, and about 15% lies along the second PC. This leaves about 9% for the third PC, so it is reasonable to assume that the third PC probably carries little information.</p>
+</div>
+</section>
+<section data-pdf-bookmark="Choosing the Right Number of Dimensions" data-type="sect2"><div class="sect2" id="idm45983115237104">
+<h2 id="sigil_toc_id_149" class="sigil_not_in_toc">Choosing the Right Number of Dimensions</h2>
+<p>Instead of arbitrarily choosing the number of dimensions to reduce down to, it is simpler to choose the number of dimensions that add up to a sufficiently large portion of the variance—say, 95% (An exception to this rule, of course, is if <a data-primary="principal component analysis (PCA)" data-secondary="choosing number of dimensions" data-type="indexterm" id="ix_pca_number_dim"></a><a data-primary="dimensionality reduction" data-secondary="choosing the right number of dimensions" data-type="indexterm" id="idm45983115247792"></a><a data-primary="explained variance, plotting" data-type="indexterm" id="ix_exp_variance_plot"></a><a data-primary="visualization of data" data-secondary="dimensionality reduction" data-type="indexterm" id="idm45983115246016"></a>you are reducing dimensionality for data visualization, in which case you will want to reduce the dimensionality down to 2 or 3).</p>
+<p>The following code loads and splits the MNIST dataset (introduced in <a data-type="xref" href="HOMLWSKT007.xhtml#classification_chapter">Chapter 3</a>) and performs PCA without reducing dimensionality, then computes the minimum number of dimensions required to preserve 95% of the training set’s variance:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.datasets</code> <code class="kn">import</code> <code class="n">fetch_openml</code>
+
+<code class="n">mnist</code> <code class="o">=</code> <code class="n">fetch_openml</code><code class="p">(</code><code class="s1">'mnist_784'</code><code class="p">,</code> <code class="n">as_frame</code><code class="o">=</code><code class="kc">False</code><code class="p">)</code>
+<code class="n">X_train</code><code class="p">,</code> <code class="n">y_train</code> <code class="o">=</code> <code class="n">mnist</code><code class="o">.</code><code class="n">data</code><code class="p">[:</code><code class="mi">60_000</code><code class="p">],</code> <code class="n">mnist</code><code class="o">.</code><code class="n">target</code><code class="p">[:</code><code class="mi">60_000</code><code class="p">]</code>
+<code class="n">X_test</code><code class="p">,</code> <code class="n">y_test</code> <code class="o">=</code> <code class="n">mnist</code><code class="o">.</code><code class="n">data</code><code class="p">[</code><code class="mi">60_000</code><code class="p">:],</code> <code class="n">mnist</code><code class="o">.</code><code class="n">target</code><code class="p">[</code><code class="mi">60_000</code><code class="p">:]</code>
+
+<code class="n">pca</code> <code class="o">=</code> <code class="n">PCA</code><code class="p">()</code>
+<code class="n">pca</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_train</code><code class="p">)</code>
+<code class="n">cumsum</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">cumsum</code><code class="p">(</code><code class="n">pca</code><code class="o">.</code><code class="n">explained_variance_ratio_</code><code class="p">)</code>
+<code class="n">d</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">argmax</code><code class="p">(</code><code class="n">cumsum</code> <code class="o">&gt;=</code> <code class="mf">0.95</code><code class="p">)</code> <code class="o">+</code> <code class="mi">1</code>  <code class="c1"># d equals 154</code></pre>
+<p>You could then set <code>n_components=d</code> and run PCA again, but there’s a better option. Instead of specifying the number of principal components you want to preserve, you can set <code>n_components</code> to be a float between 0.0 and 1.0, indicating the ratio of variance you wish to preserve:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">pca</code> <code class="o">=</code> <code class="n">PCA</code><code class="p">(</code><code class="n">n_components</code><code class="o">=</code><code class="mf">0.95</code><code class="p">)</code>
+<code class="n">X_reduced</code> <code class="o">=</code> <code class="n">pca</code><code class="o">.</code><code class="n">fit_transform</code><code class="p">(</code><code class="n">X_train</code><code class="p">)</code></pre>
+<p>The actual number of components is determined during training, and it is stored in the <code>n_components_</code> attribute:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">pca</code><code class="o">.</code><code class="n">n_components_</code>
+<code class="go">154</code></pre>
+<p>Yet another option is to plot the explained variance as a function of the number of dimensions (simply plot <code>cumsum</code>; see <a data-type="xref" href="#explained_variance_plot">Figure 8-8</a>). There will usually be an elbow in the curve, where the explained variance stops growing fast. In this case, you can see that reducing the dimensionality down to about 100 dimensions wouldn’t lose too much explained variance.</p>
+<figure class="smallersixty"><div class="figure" id="explained_variance_plot">
+<img alt="mls3 0808" height="380" src="../Images/mls3_0808.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-8. </span>Explained variance as a function of the number of dimensions</h6>
+</div>
+</figure>
+<p>Lastly, if you are using dimensionality reduction as a preprocessing step for a supervised learning task (e.g., classification), then you can tune the number of dimensions as you would any other hyperparameter (see <a data-type="xref" href="HOMLWSKT006.xhtml#project_chapter">Chapter 2</a>). <a data-primary="hyperparameters" data-secondary="dimensionality reduction" data-type="indexterm" id="idm45983115069104"></a>For example, the following code example creates a two-step pipeline, first reducing dimensionality using PCA, then classifying using a random forest. <a data-primary="Scikit-Learn" data-secondary="sklearn.model_selection.RandomizedSearchCV" data-type="indexterm" id="idm45983115067872"></a>Next, it uses <code>RandomizedSearchCV</code> to find a good combination of hyperparameters for both PCA and the random forest classifier. This example does a quick search, tuning only 2 hyperparameters, training on just 1,000 instances, and running for just 10 iterations, but feel free to do a more thorough search if you have the time:<a data-primary="Scikit-Learn" data-secondary="sklearn.ensemble.RandomForestClassifier" data-type="indexterm" id="idm45983115066416"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.ensemble</code> <code class="kn">import</code> <code class="n">RandomForestClassifier</code>
+<code class="kn">from</code> <code class="nn">sklearn.model_selection</code> <code class="kn">import</code> <code class="n">RandomizedSearchCV</code>
+<code class="kn">from</code> <code class="nn">sklearn.pipeline</code> <code class="kn">import</code> <code class="n">make_pipeline</code>
+
+<code class="n">clf</code> <code class="o">=</code> <code class="n">make_pipeline</code><code class="p">(</code><code class="n">PCA</code><code class="p">(</code><code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">),</code>
+                    <code class="n">RandomForestClassifier</code><code class="p">(</code><code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">))</code>
+<code class="n">param_distrib</code> <code class="o">=</code> <code class="p">{</code>
+    <code class="s2">"pca__n_components"</code><code class="p">:</code> <code class="n">np</code><code class="o">.</code><code class="n">arange</code><code class="p">(</code><code class="mi">10</code><code class="p">,</code> <code class="mi">80</code><code class="p">),</code>
+    <code class="s2">"randomforestclassifier__n_estimators"</code><code class="p">:</code> <code class="n">np</code><code class="o">.</code><code class="n">arange</code><code class="p">(</code><code class="mi">50</code><code class="p">,</code> <code class="mi">500</code><code class="p">)</code>
+<code class="p">}</code>
+<code class="n">rnd_search</code> <code class="o">=</code> <code class="n">RandomizedSearchCV</code><code class="p">(</code><code class="n">clf</code><code class="p">,</code> <code class="n">param_distrib</code><code class="p">,</code> <code class="n">n_iter</code><code class="o">=</code><code class="mi">10</code><code class="p">,</code> <code class="n">cv</code><code class="o">=</code><code class="mi">3</code><code class="p">,</code>
+                                <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">rnd_search</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_train</code><code class="p">[:</code><code class="mi">1000</code><code class="p">],</code> <code class="n">y_train</code><code class="p">[:</code><code class="mi">1000</code><code class="p">])</code></pre>
+<p>Let’s look at the best hyperparameters found:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="nb">print</code><code class="p">(</code><code class="n">rnd_search</code><code class="o">.</code><code class="n">best_params_</code><code class="p">)</code>
+<code class="go">{'randomforestclassifier__n_estimators': 465, 'pca__n_components': 23}</code></pre>
+<p>It’s interesting to note how low the optimal number of components is: we reduced a 784-dimensional dataset to just 23 dimensions! This is tied to the fact that we used a random forest, which is a pretty powerful model. If we used a linear model instead, such as an <code>SGDClassifier</code>, the search would find that we need to preserve more dimensions (about 70).<a data-primary="" data-startref="ix_variance_ex" data-type="indexterm" id="idm45983114960080"></a><a data-primary="" data-startref="ix_exp_variance_plot" data-type="indexterm" id="idm45983114959232"></a><a data-primary="" data-startref="ix_pca_number_dim" data-type="indexterm" id="idm45983114881120"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="PCA for Compression" data-type="sect2"><div class="sect2" id="idm45983115236512">
+<h2 id="sigil_toc_id_150" class="sigil_not_in_toc">PCA for Compression</h2>
+<p>After dimensionality reduction, the training set takes up much less space. <a data-primary="compression and decompression, PCA" data-type="indexterm" id="ix_compress_pca"></a><a data-primary="principal component analysis (PCA)" data-secondary="for compression" data-secondary-sortas="compression" data-type="indexterm" id="ix_pca_compress"></a>For example, after applying PCA to the MNIST dataset while preserving 95% of its variance, we are left with 154 features, instead of the original 784 features. So the dataset is now less than 20% of its original size, and we only lost 5% of its variance! This is a reasonable compression ratio, and it’s easy to see how such a size reduction would speed up a classification algorithm tremendously.</p>
+<p>It is also possible to decompress the reduced dataset back to 784 dimensions by applying the inverse transformation of the PCA projection. This won’t give you back the original data, since the projection lost a bit of information (within the 5% variance that was dropped), but it will likely be close to the original data. <a data-primary="reconstruction error" data-type="indexterm" id="idm45983114875728"></a>The mean squared distance between the original data and the reconstructed data (compressed and then decompressed) is called the <em>reconstruction error</em>.</p>
+<p>The <code>inverse_transform()</code> method lets us decompress the reduced MNIST dataset back to 784 dimensions:<a data-primary="inverse_transform()" data-type="indexterm" id="idm45983114873616"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">X_recovered</code> <code class="o">=</code> <code class="n">pca</code><code class="o">.</code><code class="n">inverse_transform</code><code class="p">(</code><code class="n">X_reduced</code><code class="p">)</code></pre>
+<p><a data-type="xref" href="#mnist_compression_plot">Figure 8-9</a> shows a few digits from the original training set (on the left), and the corresponding digits after compression and decompression. You can see that there is a slight image quality loss, but the digits are still mostly intact.</p>
+<figure class="smallereighty"><div class="figure" id="mnist_compression_plot">
+<img alt="mls3 0809" height="318" src="../Images/mls3_0809.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-9. </span>MNIST compression that preserves 95% of the variance</h6>
+</div>
+</figure>
+<p>The equation for the inverse transformation is shown in <a data-type="xref" href="#inverse_pca">Equation 8-3</a>.<a data-primary="" data-startref="ix_pca_compress" data-type="indexterm" id="idm45983114847808"></a><a data-primary="" data-startref="ix_compress_pca" data-type="indexterm" id="idm45983114846832"></a></p>
+<div class="fifty-percent" data-type="equation" id="inverse_pca"><h5 class="sigil_not_in_toc"><span class="label">Equation 8-3. </span>PCA inverse transformation, back to the original number of dimensions</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mrow>
+<msub><mi mathvariant="bold">X</mi> <mtext>recovered</mtext> </msub>
+<mo>=</mo>
+<msub><mi mathvariant="bold">X</mi> <mrow><mi>d</mi><mtext>-proj</mtext></mrow> </msub>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mi>d</mi> </msub></mrow> <mo>⊺</mo> </msup>
+</mrow>
+</math>
+</div>
+</div>
+</section>
+<section data-pdf-bookmark="Randomized PCA" data-type="sect2"><div class="sect2" id="idm45983114808048">
+<h2 id="sigil_toc_id_151" class="sigil_not_in_toc">Randomized PCA</h2>
+<p>If you set the <code>svd_solver</code> hyperparameter to <code>"randomized"</code>, Scikit-Learn uses a stochastic algorithm called <em>randomized PCA</em> that quickly finds an approximation of the first <em>d</em> principal components. <a data-primary="principal component analysis (PCA)" data-secondary="randomized PCA" data-type="indexterm" id="idm45983114804576"></a><a data-primary="randomized PCA" data-type="indexterm" id="idm45983114803696"></a><a data-primary="singular value decomposition (SVD)" data-type="indexterm" id="idm45983114803024"></a><a data-primary="SVD (singular value decomposition)" data-type="indexterm" id="idm45983114802384"></a>Its computational complexity is <em>O</em>(<em>m</em> × <em>d</em><sup>2</sup>) + <em>O</em>(<em>d</em><sup>3</sup>), instead of <em>O</em>(<em>m</em> × <em>n</em><sup>2</sup>) + <em>O</em>(<em>n</em><sup>3</sup>) for the full SVD approach, so it is dramatically faster than full SVD when <em>d</em> is much smaller than <em>n</em>:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">rnd_pca</code> <code class="o">=</code> <code class="n">PCA</code><code class="p">(</code><code class="n">n_components</code><code class="o">=</code><code class="mi">154</code><code class="p">,</code> <code class="n">svd_solver</code><code class="o">=</code><code class="s2">"randomized"</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">X_reduced</code> <code class="o">=</code> <code class="n">rnd_pca</code><code class="o">.</code><code class="n">fit_transform</code><code class="p">(</code><code class="n">X_train</code><code class="p">)</code></pre>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>By default, <code>svd_solver</code> is actually set to <code>"auto"</code>: Scikit-Learn automatically uses the randomized PCA algorithm if max(<em>m</em>, <em>n</em>) &gt; 500 and <code>n_components</code> is an integer smaller than 80% of min(<em>m</em>, <em>n</em>), or else it uses the full SVD approach. So the preceding code would use the randomized PCA algorithm even if you removed the <code>svd_solver="randomized"</code> argument, since 154 &lt; 0.8 × 784. If you want to force Scikit-Learn to use full SVD for a slightly more precise result, you can set the <code>svd_solver</code> hyperparameter to <code>"full"</code>.</p>
+</div>
+</div>
+</section>
+<section data-pdf-bookmark="Incremental PCA" data-type="sect2"><div class="sect2" id="idm45983114765872">
+<h2 id="sigil_toc_id_152" class="sigil_not_in_toc">Incremental PCA</h2>
+<p>One problem with the preceding implementations of PCA is that they require the whole training set to fit in memory in order for the algorithm to run. <a data-primary="incremental PCA (IPCA)" data-type="indexterm" id="ix_increment_pca"></a><a data-primary="IPCA (incremental PCA)" data-type="indexterm" id="ix_ipca_ch8"></a><a data-primary="principal component analysis (PCA)" data-secondary="incremental PCA" data-type="indexterm" id="ix_pca_increment"></a>Fortunately, <em>incremental PCA</em> (IPCA) algorithms have been developed that allow you to split the training set into mini-batches and feed these in one mini-batch at a time. This is useful for large training sets and for applying PCA online (i.e., on the fly, as new instances arrive).</p>
+<p>The following code splits the MNIST training set into 100 mini-batches (using NumPy’s <code>array_split()</code> function) and feeds them to Scikit-Learn’s <code>IncrementalPCA</code> class⁠<sup><a data-type="noteref" href="#idm45983114758752" id="idm45983114758752-marker">5</a></sup> to reduce the dimensionality of the MNIST dataset down to 154 dimensions, just like before. Note that you must call the <code>partial_fit()</code> method with each mini-batch, rather than the <code>fit()</code> method with the whole training set:<a data-primary="Scikit-Learn" data-secondary="sklearn.decomposition.IncrementalPCA" data-type="indexterm" id="idm45983114756016"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.decomposition</code> <code class="kn">import</code> <code class="n">IncrementalPCA</code>
+
+<code class="n">n_batches</code> <code class="o">=</code> <code class="mi">100</code>
+<code class="n">inc_pca</code> <code class="o">=</code> <code class="n">IncrementalPCA</code><code class="p">(</code><code class="n">n_components</code><code class="o">=</code><code class="mi">154</code><code class="p">)</code>
+<code class="k">for</code> <code class="n">X_batch</code> <code class="ow">in</code> <code class="n">np</code><code class="o">.</code><code class="n">array_split</code><code class="p">(</code><code class="n">X_train</code><code class="p">,</code> <code class="n">n_batches</code><code class="p">):</code>
+    <code class="n">inc_pca</code><code class="o">.</code><code class="n">partial_fit</code><code class="p">(</code><code class="n">X_batch</code><code class="p">)</code>
+
+<code class="n">X_reduced</code> <code class="o">=</code> <code class="n">inc_pca</code><code class="o">.</code><code class="n">transform</code><code class="p">(</code><code class="n">X_train</code><code class="p">)</code></pre>
+<p>Alternatively, you can use NumPy’s <code>memmap</code> class, which allows you to manipulate a large array stored in a binary file on disk as if it were entirely in memory; the class loads only the data it needs in memory, when it needs it. To demonstrate this, let’s first create a memory-mapped (memmap) file and copy the MNIST training set to it, then call <code>flush()</code> to ensure that any data still in the cache gets saved to disk. In real life, <code>X_train</code> would typically not fit in memory, so you would load it chunk by chunk and save each chunk to the right part of the memmap array:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">filename</code> <code class="o">=</code> <code class="s2">"my_mnist.mmap"</code>
+<code class="n">X_mmap</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">memmap</code><code class="p">(</code><code class="n">filename</code><code class="p">,</code> <code class="n">dtype</code><code class="o">=</code><code class="s1">'float32'</code><code class="p">,</code> <code class="n">mode</code><code class="o">=</code><code class="s1">'write'</code><code class="p">,</code> <code class="n">shape</code><code class="o">=</code><code class="n">X_train</code><code class="o">.</code><code class="n">shape</code><code class="p">)</code>
+<code class="n">X_mmap</code><code class="p">[:]</code> <code class="o">=</code> <code class="n">X_train</code>  <code class="c1"># could be a loop instead, saving the data chunk by chunk</code>
+<code class="n">X_mmap</code><code class="o">.</code><code class="n">flush</code><code class="p">()</code></pre>
+<p>Next, we can load the memmap file and use it like a regular NumPy array. Let’s use the <code>IncrementalPCA</code> class to reduce its dimensionality. Since this algorithm uses only a small part of the array at any given time, memory usage remains under control. This makes it possible to call the usual <code>fit()</code> method instead of <code>partial_fit()</code>, which is quite convenient:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">X_mmap</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">memmap</code><code class="p">(</code><code class="n">filename</code><code class="p">,</code> <code class="n">dtype</code><code class="o">=</code><code class="s2">"float32"</code><code class="p">,</code> <code class="n">mode</code><code class="o">=</code><code class="s2">"readonly"</code><code class="p">)</code><code class="o">.</code><code class="n">reshape</code><code class="p">(</code><code class="o">-</code><code class="mi">1</code><code class="p">,</code> <code class="mi">784</code><code class="p">)</code>
+<code class="n">batch_size</code> <code class="o">=</code> <code class="n">X_mmap</code><code class="o">.</code><code class="n">shape</code><code class="p">[</code><code class="mi">0</code><code class="p">]</code> <code class="o">//</code> <code class="n">n_batches</code>
+<code class="n">inc_pca</code> <code class="o">=</code> <code class="n">IncrementalPCA</code><code class="p">(</code><code class="n">n_components</code><code class="o">=</code><code class="mi">154</code><code class="p">,</code> <code class="n">batch_size</code><code class="o">=</code><code class="n">batch_size</code><code class="p">)</code>
+<code class="n">inc_pca</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_mmap</code><code class="p">)</code></pre>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>Only the raw binary data is saved to disk, so you need to specify the data type and shape of the array when you load it. If you omit the shape, <code>np.memmap()</code> returns a 1D array.</p>
+</div>
+<p>For very high-dimensional datasets, PCA can be too slow. As you saw earlier, even if you use randomized PCA its computational complexity is still <em>O</em>(<em>m</em> × <em>d</em><sup>2</sup>) + <em>O</em>(<em>d</em><sup>3</sup>), so the target number of dimensions <em>d</em> must not be too large. If you are dealing with a dataset with tens of thousands of features or more (e.g., images), then training may become much too slow: in this case, you should consider using random projection instead.<a data-primary="" data-startref="ix_princ_comp_anal_pca" data-type="indexterm" id="idm45983114501680"></a><a data-primary="" data-startref="ix_pca_increment" data-type="indexterm" id="idm45983114500704"></a><a data-primary="" data-startref="ix_increment_pca" data-type="indexterm" id="idm45983114499760"></a><a data-primary="" data-startref="ix_ipca_ch8" data-type="indexterm" id="idm45983114498816"></a></p>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Random Projection" data-type="sect1"><div class="sect1" id="idm45983115508144">
+<h2 id="sigil_toc_id_153">Random Projection</h2>
+<p>As its name suggests, the random projection algorithm projects the data to a lower-dimensional space using a random linear projection. <a data-primary="random projection algorithm" data-type="indexterm" id="ix_random_dim_reduct"></a><a data-primary="dimensionality reduction" data-secondary="random projection algorithm" data-type="indexterm" id="ix_dim_reduct_random"></a>This may sound crazy, but it turns out that such a random projection is actually very likely to preserve distances fairly well, as was demonstrated mathematically by William B. Johnson and Joram Lindenstrauss in a famous lemma. So, two similar instances will remain similar after the projection, and two very different instances will remain very different.</p>
+<p>Obviously, the more dimensions you drop, the more information is lost, and the more distances get distorted. So how can you choose the optimal number of dimensions? Well, Johnson and Lindenstrauss came up with an equation that determines the minimum number of dimensions to preserve in order to ensure—with high probability—that distances won’t change by more than a given tolerance. For example, if you have a dataset containing <em>m</em> = 5,000 instances with <em>n</em> = 20,000 features each, and you don’t want the squared distance between any two instances to change by more than <em>ε</em> = 10%,<sup><a data-type="noteref" href="#idm45983114492224" id="idm45983114492224-marker">6</a></sup> then you should project the data down to <em>d</em> dimensions, with <em>d</em> ≥ 4 log(<em>m</em>) / (½ <em>ε</em>² - ⅓ <em>ε</em>³), which is 7,300 dimensions. That’s quite a significant dimensionality reduction! Notice that the equation does not use <em>n</em>, it only relies on <em>m</em> and <em>ε</em>. This equation is implemented by the <code>johnson_lindenstrauss_min_dim()</code> function:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="kn">from</code> <code class="nn">sklearn.random_projection</code> <code class="kn">import</code> <code class="n">johnson_lindenstrauss_min_dim</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">m</code><code class="p">,</code> <code class="n">ε</code> <code class="o">=</code> <code class="mi">5_000</code><code class="p">,</code> <code class="mf">0.1</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">d</code> <code class="o">=</code> <code class="n">johnson_lindenstrauss_min_dim</code><code class="p">(</code><code class="n">m</code><code class="p">,</code> <code class="n">eps</code><code class="o">=</code><code class="n">ε</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">d</code>
+<code class="go">7300</code></pre>
+<p>Now we can just generate a random matrix <strong>P</strong> of shape [<em>d</em>, <em>n</em>], where each item is sampled randomly from a Gaussian distribution with mean 0 and variance 1 / <em>d</em>, and use it to project a dataset from <em>n</em> dimensions down to <em>d</em>:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">n</code> <code class="o">=</code> <code class="mi">20_000</code>
+<code class="n">np</code><code class="o">.</code><code class="n">random</code><code class="o">.</code><code class="n">seed</code><code class="p">(</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">P</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">random</code><code class="o">.</code><code class="n">randn</code><code class="p">(</code><code class="n">d</code><code class="p">,</code> <code class="n">n</code><code class="p">)</code> <code class="o">/</code> <code class="n">np</code><code class="o">.</code><code class="n">sqrt</code><code class="p">(</code><code class="n">d</code><code class="p">)</code>  <code class="c1"># std dev = square root of variance</code>
+
+<code class="n">X</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">random</code><code class="o">.</code><code class="n">randn</code><code class="p">(</code><code class="n">m</code><code class="p">,</code> <code class="n">n</code><code class="p">)</code>  <code class="c1"># generate a fake dataset</code>
+<code class="n">X_reduced</code> <code class="o">=</code> <code class="n">X</code> <code class="o">@</code> <code class="n">P</code><code class="o">.</code><code class="n">T</code></pre>
+<p>That’s all there is to it! It’s simple and efficient, and no training is required: the only thing the algorithm needs to create the random matrix is the dataset’s shape. The data itself is not used at all.</p>
+<p>Scikit-Learn offers a <code>GaussianRandomProjection</code> class to do exactly what we just did: when you call its <code>fit()</code> method, it uses <code>johnson_lindenstrauss_min_dim()</code> to determine the output dimensionality, then it generates a random matrix, which it stores in the <code>components_</code> attribute. <a data-primary="Scikit-Learn" data-secondary="sklearn.random_projection.GaussianRandomProjection" data-type="indexterm" id="idm45983114383664"></a>Then when you call <code>transform()</code>, it uses this matrix to perform the projection. When creating the transformer, you can set <code>eps</code> if you want to tweak <em>ε</em> (it defaults to 0.1), and <code>n_components</code> if you want to force a specific target dimensionality <em>d</em>. The following code example gives the same result as the preceding code (you can also verify that <code>gaussian_rnd_proj.components_</code> is equal to <code>P</code>):</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.random_projection</code> <code class="kn">import</code> <code class="n">GaussianRandomProjection</code>
+
+<code class="n">gaussian_rnd_proj</code> <code class="o">=</code> <code class="n">GaussianRandomProjection</code><code class="p">(</code><code class="n">eps</code><code class="o">=</code><code class="n">ε</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">X_reduced</code> <code class="o">=</code> <code class="n">gaussian_rnd_proj</code><code class="o">.</code><code class="n">fit_transform</code><code class="p">(</code><code class="n">X</code><code class="p">)</code>  <code class="c1"># same result as above</code></pre>
+<p>Scikit-Learn also provides a second random projection transformer, known as 
+<span class="keep-together"><code>SparseRandomProjection</code>.</span> <a data-primary="Scikit-Learn" data-secondary="sklearn.random_projection.SparseRandomProjection" data-type="indexterm" id="idm45983114313696"></a>It determines the target dimensionality in the same way, generates a random matrix of the same shape, and performs the projection identically. The main difference is that the random matrix is sparse. This means it uses much less memory: about 25 MB instead of almost 1.2 GB in the preceding example! And it’s also much faster, both to generate the random matrix and to reduce dimensionality: about 50% faster in this case. Moreover, if the input is sparse, the transformation keeps it sparse (unless you set <code>dense_output=True</code>). Lastly, it enjoys the same distance-preserving property as the previous approach, and the quality of the dimensionality reduction is comparable. In short, it’s usually preferable to use this transformer instead of the first one, especially for large or sparse datasets.</p>
+<p>The ratio <em>r</em> of nonzero items in the sparse random matrix is called its <em>density</em>. By default, it is equal to <math xmlns="http://www.w3.org/1998/Math/MathML"><mn>1</mn><mo>/</mo><msqrt><mi>n</mi></msqrt></math>. With 20,000 features, this means that only 1 in ~141 cells in the random matrix is nonzero: that’s quite sparse! You can set the <code>density</code> hyperparameter to another value if you prefer. Each cell in the sparse random matrix has a probability <em>r</em> of being nonzero, and each nonzero value is either –<em>v</em> or +<em>v</em> (both equally likely), where <em>v</em> = <math xmlns="http://www.w3.org/1998/Math/MathML"><mn>1</mn><mo>/</mo><msqrt><mi>d</mi><mi>r</mi></msqrt></math>.</p>
+<p>If you want to perform the inverse transform, you first need to compute the pseudo-inverse of the components matrix using SciPy’s <code>pinv()</code> function, then multiply the reduced data by the transpose of the pseudo-inverse:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">components_pinv</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">linalg</code><code class="o">.</code><code class="n">pinv</code><code class="p">(</code><code class="n">gaussian_rnd_proj</code><code class="o">.</code><code class="n">components_</code><code class="p">)</code>
+<code class="n">X_recovered</code> <code class="o">=</code> <code class="n">X_reduced</code> <code class="o">@</code> <code class="n">components_pinv</code><code class="o">.</code><code class="n">T</code></pre>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>Computing the pseudo-inverse may take a very long time if the components matrix is large, as the computational complexity of <code>pinv()</code> is <em>O</em>(<em>dn</em>²) if <em>d</em> &lt; <em>n</em>, or <em>O</em>(<em>nd</em>²) otherwise.</p>
+</div>
+<p>In summary, random projection is a simple, fast, memory-efficient, and surprisingly powerful dimensionality reduction algorithm that you should keep in mind, especially when you deal with high-dimensional datasets.<a data-primary="" data-startref="ix_dim_reduct_random" data-type="indexterm" id="idm45983114253344"></a><a data-primary="" data-startref="ix_random_dim_reduct" data-type="indexterm" id="idm45983114252368"></a></p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>Random projection is not always used to reduce the dimensionality of large datasets. For example, a <a href="https://homl.info/flies">2017 paper</a>⁠<sup><a data-type="noteref" href="#idm45983114249648" id="idm45983114249648-marker">7</a></sup> by Sanjoy Dasgupta et al. showed that the brain of a fruit fly implements an analog of random projection to map dense low-dimensional olfactory inputs to sparse high-dimensional binary outputs: for each odor, only a small fraction of the output neurons get activated, but similar odors activate many of the same neurons. <a data-primary="locality sensitive hashing (LSH)" data-type="indexterm" id="idm45983114248416"></a><a data-primary="LSH (locality sensitive hashing)" data-type="indexterm" id="idm45983114247776"></a>This is similar to a well-known algorithm called <em>locality sensitive hashing</em> (LSH), which is typically used in search engines to group similar documents.</p>
+</div>
+</div>
+</section>
+<section data-pdf-bookmark="LLE" data-type="sect1"><div class="sect1" id="idm45983114246240">
+<h2 id="sigil_toc_id_154">LLE</h2>
+<p><a href="https://homl.info/lle"><em>Locally linear embedding</em> (LLE)</a>⁠<sup><a data-type="noteref" href="#idm45983114243536" id="idm45983114243536-marker">8</a></sup> is a <em>nonlinear dimensionality reduction</em> (NLDR) technique. <a data-primary="nonlinear dimensionality reduction (NLDR)" data-type="indexterm" id="ix_nonlinear_nldr"></a><a data-primary="LLE (locally linear embedding)" data-type="indexterm" id="ix_lle_local_lin_embed"></a><a data-primary="locally linear embedding (LLE)" data-type="indexterm" id="ix_local_lin_embed_lle"></a><a data-primary="dimensionality reduction" data-secondary="LLE" data-type="indexterm" id="ix_dim_reduct_lle"></a>It is a manifold learning technique that does not rely on projections, unlike PCA and random projection. In a nutshell, LLE works by first measuring how each training instance linearly relates to its nearest neighbors, and then looking for a low-dimensional representation of the training set where these local relationships are best preserved (more details shortly). This approach makes it particularly good at unrolling twisted manifolds, especially when there is not too much noise.</p>
+<p>The following code makes a Swiss roll, then uses Scikit-Learn’s <code>LocallyLinearEmbedding</code> class to unroll it:<a data-primary="Scikit-Learn" data-secondary="sklearn.manifold.LocallyLinearEmbedding" data-type="indexterm" id="idm45983114210416"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.datasets</code> <code class="kn">import</code> <code class="n">make_swiss_roll</code>
+<code class="kn">from</code> <code class="nn">sklearn.manifold</code> <code class="kn">import</code> <code class="n">LocallyLinearEmbedding</code>
+
+<code class="n">X_swiss</code><code class="p">,</code> <code class="n">t</code> <code class="o">=</code> <code class="n">make_swiss_roll</code><code class="p">(</code><code class="n">n_samples</code><code class="o">=</code><code class="mi">1000</code><code class="p">,</code> <code class="n">noise</code><code class="o">=</code><code class="mf">0.2</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">lle</code> <code class="o">=</code> <code class="n">LocallyLinearEmbedding</code><code class="p">(</code><code class="n">n_components</code><code class="o">=</code><code class="mi">2</code><code class="p">,</code> <code class="n">n_neighbors</code><code class="o">=</code><code class="mi">10</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">X_unrolled</code> <code class="o">=</code> <code class="n">lle</code><code class="o">.</code><code class="n">fit_transform</code><code class="p">(</code><code class="n">X_swiss</code><code class="p">)</code></pre>
+<p>The variable <code>t</code> is a 1D NumPy array containing the position of each instance along the rolled axis of the Swiss roll. We don’t use it in this example, but it can be used as a target for a nonlinear regression task.</p>
+<p>The resulting 2D dataset is shown in <a data-type="xref" href="#lle_unrolling_plot">Figure 8-10</a>. As you can see, the Swiss roll is completely unrolled, and the distances between instances are locally well preserved. However, distances are not preserved on a larger scale: the unrolled Swiss roll should be a rectangle, not this kind of stretched and twisted band. Nevertheless, LLE did a pretty good job of modeling the manifold.</p>
+<figure class="width-80"><div class="figure" id="lle_unrolling_plot">
+<img alt="mls3 0810" height="384" src="../Images/mls3_0810.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-10. </span>Unrolled Swiss roll using LLE</h6>
+</div>
+</figure>
+<p>Here’s how LLE works: for each training instance <strong>x</strong><sup>(<em>i</em>)</sup>, the algorithm identifies its <em>k</em>-nearest neighbors (in the preceding code <em>k</em> = 10), then tries to reconstruct <strong>x</strong><sup>(<em>i</em>)</sup> as a linear function of these neighbors. More specifically, it tries to find the weights <em>w</em><sub><em>i,j</em></sub> such that the squared distance between <strong>x</strong><sup>(<em>i</em>)</sup> and <math xmlns="http://www.w3.org/1998/Math/MathML">
+<mrow>
+<msubsup><mo>∑</mo> <mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </msubsup>
+<mrow>
+<msub><mi>w</mi> <mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow> </msub>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup>
+</mrow>
+</mrow>
+</math> is as small as possible, assuming <em>w</em><sub><em>i,j</em></sub> = 0 if <strong>x</strong><sup>(<em>j</em>)</sup> is not one of the <em>k</em>-nearest neighbors of <strong>x</strong><sup>(<em>i</em>)</sup>. Thus the first step of LLE is the constrained optimization problem described in <a data-type="xref" href="#lle_first_step">Equation 8-4</a>, where <strong>W</strong> is the weight matrix containing all the weights <em>w</em><sub><em>i,j</em></sub>. The second constraint simply normalizes the weights for each training instance <strong>x</strong><sup>(<em>i</em>)</sup>.</p>
+<div data-type="equation" id="lle_first_step"><h5 class="sigil_not_in_toc"><span class="label">Equation 8-4. </span>LLE step 1: linearly modeling local relationships</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mover accent="true"><mi mathvariant="bold">W</mi> <mo>^</mo></mover>
+<mo>=</mo>
+<munder><mo form="prefix">argmin</mo> <mi mathvariant="bold">W</mi></munder>
+<mstyle displaystyle="true" scriptlevel="0">
+<munderover><mo>∑</mo> <mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </munderover>
+</mstyle>
+<msup><mfenced close=")" open="(" separators=""><msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><mo>-</mo><munderover><mo>∑</mo> <mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </munderover><msub><mi>w</mi> <mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow> </msub><msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup></mfenced> <mn>2</mn> </msup>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mtext>subject</mtext>
+<mspace width="4.pt"/>
+<mtext>to</mtext>
+<mspace width="4.pt"/>
+<mfenced close="" open="{" separators="">
+<mtable>
+<mtr>
+<mtd columnalign="left">
+<mrow>
+<msub><mi>w</mi> <mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow> </msub>
+<mo>=</mo>
+<mn>0</mn>
+</mrow>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mtext>if</mtext>
+<mspace width="4.pt"/>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup>
+<mspace width="4.pt"/>
+<mtext>is</mtext>
+<mspace width="4.pt"/>
+<mtext>not</mtext>
+<mspace width="4.pt"/>
+<mtext>one</mtext>
+<mspace width="4.pt"/>
+<mtext>of</mtext>
+<mspace width="4.pt"/>
+<mtext>the</mtext>
+<mspace width="4.pt"/>
+<mi>k</mi>
+<mspace width="4.pt"/>
+<mtext>n.n.</mtext>
+<mspace width="4.pt"/>
+<mtext>of</mtext>
+<mspace width="4.pt"/>
+<msup><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="left">
+<mrow>
+<munderover><mo>∑</mo> <mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </munderover>
+<msub><mi>w</mi> <mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow> </msub>
+<mo>=</mo>
+<mn>1</mn>
+</mrow>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mtext>for</mtext>
+<mspace width="4.pt"/>
+<mi>i</mi>
+<mo>=</mo>
+<mn>1</mn>
+<mo>,</mo>
+<mn>2</mn>
+<mo>,</mo>
+<mo>⋯</mo>
+<mo>,</mo>
+<mi>m</mi>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</mfenced>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>After this step, the weight matrix <math xmlns="http://www.w3.org/1998/Math/MathML">
+<mover accent="true"><mi mathvariant="bold">W</mi> <mo>^</mo></mover>
+</math> (containing the weights <math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mover><mi>w</mi><mo>^</mo></mover><mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow></msub></math>) encodes the local linear relationships between the training instances. The second step is to map the training instances into a <em>d</em>-dimensional space (where <em>d</em> &lt; <em>n</em>) while preserving these local relationships as much as possible. If <strong>z</strong><sup>(<em>i</em>)</sup> is the image of <strong>x</strong><sup>(<em>i</em>)</sup> in this <em>d</em>-dimensional space, then we want the squared distance between <strong>z</strong><sup>(<em>i</em>)</sup> and <math xmlns="http://www.w3.org/1998/Math/MathML">
+<mrow>
+<msubsup><mo>∑</mo> <mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </msubsup>
+<mrow>
+<msub><mover accent="true"><mi>w</mi> <mo>^</mo></mover> <mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow> </msub>
+<msup><mi mathvariant="bold">z</mi> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup>
+</mrow>
+</mrow>
+</math> to be as small as possible. This idea leads to the unconstrained optimization problem described in <a data-type="xref" href="#lle_second_step">Equation 8-5</a>. It looks very similar to the first step, but instead of keeping the instances fixed and finding the optimal weights, we are doing the reverse: keeping the weights fixed and finding the optimal position of the instances’ images in the low-dimensional space. Note that <strong>Z</strong> is the matrix containing all <strong>z</strong><sup>(<em>i</em>)</sup>.</p>
+<div data-type="equation" id="lle_second_step"><h5 class="sigil_not_in_toc"><span class="label">Equation 8-5. </span>LLE step 2: reducing dimensionality while preserving relationships</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mrow>
+<mover accent="true"><mi mathvariant="bold">Z</mi> <mo>^</mo></mover>
+<mo>=</mo>
+<munder><mo form="prefix">argmin</mo> <mi mathvariant="bold">Z</mi></munder>
+<mstyle displaystyle="true" scriptlevel="0">
+<munderover><mo>∑</mo> <mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </munderover>
+</mstyle>
+<msup><mfenced close=")" open="(" separators=""><msup><mi mathvariant="bold">z</mi> <mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow> </msup><mo>-</mo><munderover><mo>∑</mo> <mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow> <mi>m</mi> </munderover><msub><mover accent="true"><mi>w</mi> <mo>^</mo></mover> <mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow> </msub><msup><mi mathvariant="bold">z</mi> <mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow> </msup></mfenced> <mn>2</mn> </msup>
+</mrow>
+</math>
+</div>
+<p>Scikit-Learn’s LLE implementation has the following computational complexity: <span class="keep-together"><em>O</em>(<em>m</em> log(<em>m</em>)<em>n</em> log(<em>k</em>))</span> for finding the <em>k</em>-nearest neighbors, <em>O</em>(<em>mnk</em><sup>3</sup>) for optimizing the weights, and <em>O</em>(<em>dm</em><sup>2</sup>) for constructing the low-dimensional representations. Unfortunately, the <em>m</em><sup>2</sup> in the last term makes this algorithm scale poorly to very large datasets.</p>
+<p>As you can see, LLE is quite different from the projection techniques, and it’s significantly more complex, but it can also construct much better low-dimensional representations, especially if the data is nonlinear.<a data-primary="" data-startref="ix_lle_local_lin_embed" data-type="indexterm" id="idm45983113990704"></a><a data-primary="" data-startref="ix_local_lin_embed_lle" data-type="indexterm" id="idm45983113989728"></a><a data-primary="" data-startref="ix_dim_reduct_lle" data-type="indexterm" id="idm45983113988784"></a><a data-primary="" data-startref="ix_nonlinear_nldr" data-type="indexterm" id="idm45983113987840"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Other Dimensionality Reduction Techniques" data-type="sect1"><div class="sect1" id="idm45983114245648">
+<h2 id="sigil_toc_id_155">Other Dimensionality Reduction Techniques</h2>
+<p>Before we conclude this chapter,  let’s take a quick look at a few other popular dimensionality reduction techniques available in Scikit-Learn:</p>
+<dl>
+<dt><code>sklearn.manifold.MDS</code></dt>
+<dd>
+<p><em>Multidimensional scaling</em> (MDS) reduces dimensionality while trying to preserve the distances between the instances. <a data-primary="MDS (multidimensional scaling)" data-type="indexterm" id="idm45983113983008"></a><a data-primary="dimensionality reduction" data-secondary="multidimensional scaling" data-type="indexterm" id="idm45983113982368"></a><a data-primary="multidimensional scaling (MDS)" data-type="indexterm" id="idm45983113981488"></a>Random projection does that for high-dimensional data, but it doesn’t work well on low-dimensional data.</p>
+</dd>
+<dt><code>sklearn.manifold.Isomap</code></dt>
+<dd>
+<p><em>Isomap</em> creates a graph by connecting each instance to its nearest neighbors, then reduces dimensionality while trying to preserve the <em>geodesic distances</em> between the instances. <a data-primary="dimensionality reduction" data-secondary="Isomap" data-type="indexterm" id="idm45983113978480"></a><a data-primary="Isomap" data-type="indexterm" id="idm45983113977536"></a><a data-primary="geodesic distance" data-type="indexterm" id="idm45983113976864"></a>The geodesic distance between two nodes in a graph is the number of nodes on the shortest path between these nodes.</p>
+</dd>
+<dt><code>sklearn.manifold.TSNE</code></dt>
+<dd>
+<p><em>t-distributed stochastic neighbor embedding</em> (t-SNE) reduces dimensionality while trying to keep similar instances close and dissimilar instances apart. <a data-primary="dimensionality reduction" data-secondary="t-distributed stochastic neighbor embedding" data-type="indexterm" id="idm45983113974048"></a><a data-primary="t-distributed stochastic neighbor embedding (t-SNE)" data-type="indexterm" id="idm45983113973040"></a><a data-primary="visualization of data" data-secondary="t-SNE" data-type="indexterm" id="idm45983113972336"></a>It is mostly used for visualization, in particular to visualize clusters of instances in high-dimensional space. For example, in the exercises at the end of this chapter you will use t-SNE to visualize a 2D map of the MNIST images.</p>
+</dd>
+<dt><code>sklearn.discriminant_analysis.LinearDiscriminantAnalysis</code></dt>
+<dd>
+<p><em>Linear discriminant analysis</em> (LDA) is a linear classification algorithm that, during training, learns the most discriminative axes between the classes. <a data-primary="LDA (linear discriminant analysis)" data-type="indexterm" id="idm45983113969600"></a><a data-primary="dimensionality reduction" data-secondary="linear discriminant analysis" data-type="indexterm" id="idm45983113968960"></a><a data-primary="linear discriminant analysis (LDA)" data-type="indexterm" id="idm45983113967984"></a>These axes can then be used to define a hyperplane onto which to project the data. The benefit of this approach is that the projection will keep classes as far apart as possible, so LDA is a good technique to reduce dimensionality before running another classification algorithm (unless LDA alone is sufficient).</p>
+</dd>
+</dl>
+<p><a data-type="xref" href="#other_dim_reduction_plot">Figure 8-11</a> shows the results of MDS, Isomap, and t-SNE on the Swiss roll. MDS manages to flatten the Swiss roll without losing its global curvature, while Isomap drops it entirely. Depending on the downstream task, preserving the large-scale structure may be good or bad. t-SNE does a reasonable job of flattening the Swiss roll, preserving a bit of curvature, and it also amplifies clusters, tearing the roll apart.<a data-primary="" data-startref="ix_dimension_reduct_ch8" data-type="indexterm" id="idm45983113965984"></a> Again, this might be good or bad, depending on the downstream task.</p>
+<figure><div class="figure" id="other_dim_reduction_plot">
+<img alt="mls3 0811" height="205" src="../Images/mls3_0811.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 8-11. </span>Using various techniques to reduce the Swiss roll to 2D</h6>
+</div>
+</figure>
+</div>
+</section>
+<section data-pdf-bookmark="Exercises" data-type="sect1"><div class="sect1" id="idm45983113962832">
+<h2 id="sigil_toc_id_156">Exercises</h2>
+<ol>
+<li>
+<p>What are the main motivations for reducing a dataset’s dimensionality? What are the main drawbacks?</p>
+</li>
+<li>
+<p>What is the curse of dimensionality?</p>
+</li>
+<li>
+<p>Once a dataset’s dimensionality has been reduced, is it possible to reverse the operation? If so, how? If not, why?</p>
+</li>
+<li>
+<p>Can PCA be used to reduce the dimensionality of a highly nonlinear dataset?</p>
+</li>
+<li>
+<p>Suppose you perform PCA on a 1,000-dimensional dataset, setting the explained variance ratio to 95%. How many dimensions will the resulting dataset have?</p>
+</li>
+<li>
+<p>In what cases would you use regular PCA, incremental PCA, randomized PCA, or random projection?</p>
+</li>
+<li>
+<p>How can you evaluate the performance of a dimensionality reduction algorithm on your dataset?</p>
+</li>
+<li>
+<p>Does it make any sense to chain two different dimensionality reduction 
+<span class="keep-together">algorithms?</span></p>
+</li>
+<li>
+<p>Load the MNIST dataset (introduced in <a data-type="xref" href="HOMLWSKT007.xhtml#classification_chapter">Chapter 3</a>) and split it into a training set and a test set (take the first 60,000 instances for training, and the remaining 10,000 for testing). Train a random forest classifier on the dataset and time how long it takes, then evaluate the resulting model on the test set. Next, use PCA to reduce the dataset’s dimensionality, with an explained variance ratio of 95%. Train a new random forest classifier on the reduced dataset and see how long it takes. Was training much faster? Next, evaluate the classifier on the test set. How does it compare to the previous classifier? Try again with an <code>SGDClassifier</code>. How much does PCA help now?</p>
+</li>
+<li>
+<p>Use t-SNE to reduce the first 5,000 images of the MNIST dataset down to 2 dimensions and plot the result using Matplotlib. You can use a scatterplot using 10 different colors to represent each image’s target class. Alternatively, you can replace each dot in the scatterplot with the corresponding instance’s class (a digit from 0 to 9), or even plot scaled-down versions of the digit images themselves (if you plot all digits the visualization will be too cluttered, so you should either draw a random sample or plot an instance only if no other instance has already been plotted at a close distance). You should get a nice visualization with well-separated clusters of digits. Try using other dimensionality reduction algorithms, such as PCA, LLE, or MDS, and compare the resulting visualizations.</p>
+</li>
+</ol>
+<p>Solutions to these exercises are available at the end of this chapter’s notebook, at <a href="https://homl.info/colab3"><em class="hyperlink">https://homl.info/colab3</em></a>.</p>
+</div>
+</section>
+<div data-type="footnotes"><p data-type="footnote" id="idm45983115568432"><sup><a href="#idm45983115568432-marker">1</a></sup> Well, four dimensions if you count time, and a few more if you are a string theorist.</p>
+<p data-type="footnote" id="idm45983115563584"><sup><a href="#idm45983115563584-marker">2</a></sup> Watch a rotating tesseract projected into 3D space at <a href="https://homl.info/30"><em class="hyperlink">https://homl.info/30</em></a>. Image by Wikipedia user NerdBoy1392 (<a href="https://creativecommons.org/licenses/by-sa/3.0">Creative Commons BY-SA 3.0</a>). Reproduced from <a href="https://en.wikipedia.org/wiki/Tesseract"><em class="hyperlink">https://en.wikipedia.org/wiki/Tesseract</em></a>.</p>
+<p data-type="footnote" id="idm45983115559056"><sup><a href="#idm45983115559056-marker">3</a></sup> Fun fact: anyone you know is probably an extremist in at least one dimension (e.g., how much sugar they put in their coffee), if you consider enough dimensions.</p>
+<p data-type="footnote" id="idm45983115496944"><sup><a href="#idm45983115496944-marker">4</a></sup> Karl Pearson, “On Lines and Planes of Closest Fit to Systems of Points in Space”, <em>The London, Edinburgh, and Dublin Philosophical Magazine and Journal of Science</em> 2, no. 11 (1901): 559–572.</p>
+<p data-type="footnote" id="idm45983114758752"><sup><a href="#idm45983114758752-marker">5</a></sup> Scikit-Learn uses the <a href="https://homl.info/32">algorithm</a> described in David A. Ross et al., “Incremental Learning for Robust Visual Tracking”, <em>International Journal of Computer Vision</em> 77, no. 1–3 (2008): 125–141.</p>
+<p data-type="footnote" id="idm45983114492224"><sup><a href="#idm45983114492224-marker">6</a></sup> <em>ε</em> is the Greek letter epsilon, often used for tiny values.</p>
+<p data-type="footnote" id="idm45983114249648"><sup><a href="#idm45983114249648-marker">7</a></sup> Sanjoy Dasgupta et al., “A neural algorithm for a fundamental computing problem”, <em>Science</em> 358, no. 6364 (2017): 793–796.</p>
+<p data-type="footnote" id="idm45983114243536"><sup><a href="#idm45983114243536-marker">8</a></sup> Sam T. Roweis and Lawrence K. Saul, “Nonlinear Dimensionality Reduction by Locally Linear Embedding”, <em>Science</em> 290, no. 5500 (2000): 2323–2326.</p>
+</div>
+</div>
+</section>
+</div>
+</body>
+</html>

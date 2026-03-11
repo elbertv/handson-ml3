@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+<title>C. Special Data Structures</title>
+<link href="../Styles/epub.css" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+<div id="sbo-rt-content"><section data-pdf-bookmark="Appendix C. Special Data Structures" data-type="appendix" epub:type="appendix"><div class="appendix" id="structures_appendix">
+<h1><span class="label">Appendix C. </span>Special Data Structures</h1>
+<p>In this appendix we will take a very quick look at the data structures supported by TensorFlow, beyond regular float or integer tensors. This includes strings, ragged tensors, sparse tensors, tensor arrays, sets, and queues.<a data-primary="TensorFlow" data-secondary="special data structures" data-type="indexterm" id="ix_tf_spec_data"></a><a data-primary="data structure" data-type="indexterm" id="ix_data_struct_appc"></a></p>
+<section data-pdf-bookmark="Strings" data-type="sect1"><div class="sect1" id="idm45983064541760">
+<h2 id="sigil_toc_id_397">Strings</h2>
+<p>Tensors can hold byte strings, <a data-primary="strings" data-type="indexterm" id="ix_strings_data_struct"></a>which is useful in particular for natural language processing (see <a data-type="xref" href="HOMLWSKT021.xhtml#nlp_chapter">Chapter 16</a>):</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">(</code><code class="sa">b</code><code class="s2">"hello world"</code><code class="p">)</code>
+<code class="go">&lt;tf.Tensor: shape=(), dtype=string, numpy=b'hello world'&gt;</code></pre>
+<p>If you try to build a tensor with a Unicode string, TensorFlow automatically encodes it to UTF-8:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">(</code><code class="s2">"café"</code><code class="p">)</code>
+<code class="go">&lt;tf.Tensor: shape=(), dtype=string, numpy=b'caf\xc3\xa9'&gt;</code></pre>
+<p>It is also possible to create tensors representing Unicode strings. Just create an array of 32-bit integers, each representing a single Unicode code point:⁠<sup><a data-type="noteref" href="#idm45983064512688" id="idm45983064512688-marker">1</a></sup></p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">u</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">([</code><code class="nb">ord</code><code class="p">(</code><code class="n">c</code><code class="p">)</code> <code class="k">for</code> <code class="n">c</code> <code class="ow">in</code> <code class="s2">"café"</code><code class="p">])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">u</code>
+<code class="go">&lt;tf.Tensor: shape=(4,), [...], numpy=array([ 99,  97, 102, 233], dtype=int32)&gt;</code></pre>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>In tensors of type <code>tf.string</code>, the string length is not part of the tensor’s shape. In other words, strings are considered as atomic values. However, in a Unicode string tensor (i.e., an int32 tensor), the length of the string <em>is</em> part of the tensor’s shape.</p>
+</div>
+<p>The <code>tf.strings</code> package contains several functions to manipulate string tensors, such as <code>length()</code> to count the number of bytes in a byte string (or the number of code points if you set <code>unit="UTF8_CHAR"</code>), <code>unicode_encode()</code> to convert a Unicode string tensor (i.e., int32 tensor) to a byte string tensor, and <code>unicode_decode()</code> to do the reverse:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">b</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">strings</code><code class="o">.</code><code class="n">unicode_encode</code><code class="p">(</code><code class="n">u</code><code class="p">,</code> <code class="s2">"UTF-8"</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">b</code>
+<code class="go">&lt;tf.Tensor: shape=(), dtype=string, numpy=b'caf\xc3\xa9'&gt;</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">tf</code><code class="o">.</code><code class="n">strings</code><code class="o">.</code><code class="n">length</code><code class="p">(</code><code class="n">b</code><code class="p">,</code> <code class="n">unit</code><code class="o">=</code><code class="s2">"UTF8_CHAR"</code><code class="p">)</code>
+<code class="go">&lt;tf.Tensor: shape=(), dtype=int32, numpy=4&gt;</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">tf</code><code class="o">.</code><code class="n">strings</code><code class="o">.</code><code class="n">unicode_decode</code><code class="p">(</code><code class="n">b</code><code class="p">,</code> <code class="s2">"UTF-8"</code><code class="p">)</code>
+<code class="go">&lt;tf.Tensor: shape=(4,), [...], numpy=array([ 99,  97, 102, 233], dtype=int32)&gt;</code></pre>
+<p>You can also manipulate tensors containing multiple strings:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">p</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">([</code><code class="s2">"Café"</code><code class="p">,</code> <code class="s2">"Coffee"</code><code class="p">,</code> <code class="s2">"caffè"</code><code class="p">,</code> <code class="s2">"咖啡"</code><code class="p">])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">tf</code><code class="o">.</code><code class="n">strings</code><code class="o">.</code><code class="n">length</code><code class="p">(</code><code class="n">p</code><code class="p">,</code> <code class="n">unit</code><code class="o">=</code><code class="s2">"UTF8_CHAR"</code><code class="p">)</code>
+<code class="go">&lt;tf.Tensor: shape=(4,), dtype=int32, numpy=array([4, 6, 5, 2], dtype=int32)&gt;</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">r</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">strings</code><code class="o">.</code><code class="n">unicode_decode</code><code class="p">(</code><code class="n">p</code><code class="p">,</code> <code class="s2">"UTF8"</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">r</code>
+<code class="go">&lt;tf.RaggedTensor [[67, 97, 102, 233], [67, 111, 102, 102, 101, 101], [99, 97,</code>
+<code class="go">102, 102, 232], [21654, 21857]]&gt;</code></pre>
+<p>Notice that the decoded strings are stored in a <code>RaggedTensor</code>. What is that?<a data-primary="" data-startref="ix_strings_data_struct" data-type="indexterm" id="idm45983064298720"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Ragged Tensors" data-type="sect1"><div class="sect1" id="idm45983064541168">
+<h2 id="sigil_toc_id_398">Ragged Tensors</h2>
+<p>A <em>ragged tensor</em> is a special kind of tensor that represents a list of arrays of different sizes. More generally, it is a tensor with one or more <em>ragged dimensions</em>, meaning dimensions whose slices may have different lengths. In the ragged tensor <code>r</code>, the second dimension is a ragged dimension. In all ragged tensors, the first dimension is always a regular dimension (also called a <em>uniform dimension</em>).</p>
+<p>All the elements of the ragged tensor <code>r</code> are regular tensors. For example, let’s look at the second element of the ragged tensor:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">r</code><code class="p">[</code><code class="mi">1</code><code class="p">]</code>
+<code class="go">&lt;tf.Tensor: [...], numpy=array([ 67, 111, 102, 102, 101, 101], dtype=int32)&gt;</code></pre>
+<p>The <code>tf.ragged</code> package contains several functions to create and manipulate ragged tensors. Let’s create a second ragged tensor using <code>tf.ragged.constant()</code> and concatenate it with the first ragged tensor, along axis 0:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">r2</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">ragged</code><code class="o">.</code><code class="n">constant</code><code class="p">([[</code><code class="mi">65</code><code class="p">,</code> <code class="mi">66</code><code class="p">],</code> <code class="p">[],</code> <code class="p">[</code><code class="mi">67</code><code class="p">]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">tf</code><code class="o">.</code><code class="n">concat</code><code class="p">([</code><code class="n">r</code><code class="p">,</code> <code class="n">r2</code><code class="p">],</code> <code class="n">axis</code><code class="o">=</code><code class="mi">0</code><code class="p">)</code>
+<code class="go">&lt;tf.RaggedTensor [[67, 97, 102, 233], [67, 111, 102, 102, 101, 101], [99, 97,</code>
+<code class="go">102, 102, 232], [21654, 21857], [65, 66], [], [67]]&gt;</code></pre>
+<p>The result is not too surprising: the tensors in <code>r2</code> were appended after the tensors in <code>r</code> along axis 0. But what if we concatenate <code>r</code> and another ragged tensor along axis 1?</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">r3</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">ragged</code><code class="o">.</code><code class="n">constant</code><code class="p">([[</code><code class="mi">68</code><code class="p">,</code> <code class="mi">69</code><code class="p">,</code> <code class="mi">70</code><code class="p">],</code> <code class="p">[</code><code class="mi">71</code><code class="p">],</code> <code class="p">[],</code> <code class="p">[</code><code class="mi">72</code><code class="p">,</code> <code class="mi">73</code><code class="p">]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="nb">print</code><code class="p">(</code><code class="n">tf</code><code class="o">.</code><code class="n">concat</code><code class="p">([</code><code class="n">r</code><code class="p">,</code> <code class="n">r3</code><code class="p">],</code> <code class="n">axis</code><code class="o">=</code><code class="mi">1</code><code class="p">))</code>
+<code class="go">&lt;tf.RaggedTensor [[67, 97, 102, 233, 68, 69, 70], [67, 111, 102, 102, 101, 101,</code>
+<code class="go">71], [99, 97, 102, 102, 232], [21654, 21857, 72, 73]]&gt;</code></pre>
+<p>This time, notice that the <em>i</em><sup>th</sup> tensor in <code>r</code> and the <em>i</em><sup>th</sup> tensor in <code>r3</code> were concatenated. Now that’s more unusual, since all of these tensors can have different lengths.</p>
+<p>If you call the <code>to_tensor()</code> method, the ragged tensor gets converted to a regular tensor, padding shorter tensors with zeros to get tensors of equal lengths (you can change the default value by setting the <code>default_value</code> argument):</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">r</code><code class="o">.</code><code class="n">to_tensor</code><code class="p">()</code>
+<code class="go">&lt;tf.Tensor: shape=(4, 6), dtype=int32, numpy=</code>
+<code class="go">array([[   67,    97,   102,   233,     0,     0],</code>
+<code class="go">       [   67,   111,   102,   102,   101,   101],</code>
+<code class="go">       [   99,    97,   102,   102,   232,     0],</code>
+<code class="go">       [21654, 21857,     0,     0,     0,     0]], dtype=int32)&gt;</code></pre>
+<p>Many TF operations support ragged tensors. For the full list, see the documentation of the <code>tf.RaggedTensor</code> class.</p>
+</div>
+</section>
+<section data-pdf-bookmark="Sparse Tensors" data-type="sect1"><div class="sect1" id="idm45983064297248">
+<h2 id="sigil_toc_id_399">Sparse Tensors</h2>
+<p>TensorFlow can also efficiently represent <em>sparse tensors</em> (i.e., tensors containing mostly zeros). <a data-primary="sparse tensors" data-type="indexterm" id="idm45983064094944"></a>Just create a <code>tf.SparseTensor</code>, specifying the indices and values of the nonzero elements and the tensor’s shape. The indices must be listed in “reading order” (from left to right, and top to bottom). If you are unsure, just use <code>tf.sparse.reorder()</code>. You can convert a sparse tensor to a dense tensor (i.e., a regular tensor) using <code>tf.sparse.to_dense()</code>:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">s</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">SparseTensor</code><code class="p">(</code><code class="n">indices</code><code class="o">=</code><code class="p">[[</code><code class="mi">0</code><code class="p">,</code> <code class="mi">1</code><code class="p">],</code> <code class="p">[</code><code class="mi">1</code><code class="p">,</code> <code class="mi">0</code><code class="p">],</code> <code class="p">[</code><code class="mi">2</code><code class="p">,</code> <code class="mi">3</code><code class="p">]],</code>
+<code class="gp">... </code>                    <code class="n">values</code><code class="o">=</code><code class="p">[</code><code class="mf">1.</code><code class="p">,</code> <code class="mf">2.</code><code class="p">,</code> <code class="mf">3.</code><code class="p">],</code>
+<code class="gp">... </code>                    <code class="n">dense_shape</code><code class="o">=</code><code class="p">[</code><code class="mi">3</code><code class="p">,</code> <code class="mi">4</code><code class="p">])</code>
+<code class="gp">...</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">tf</code><code class="o">.</code><code class="n">sparse</code><code class="o">.</code><code class="n">to_dense</code><code class="p">(</code><code class="n">s</code><code class="p">)</code>
+<code class="go">&lt;tf.Tensor: shape=(3, 4), dtype=float32, numpy=</code>
+<code class="go">array([[0., 1., 0., 0.],</code>
+<code class="go">       [2., 0., 0., 0.],</code>
+<code class="go">       [0., 0., 0., 3.]], dtype=float32)&gt;</code></pre>
+<p>Note that sparse tensors do not support as many operations as dense tensors. For example, you can multiply a sparse tensor by any scalar value, and you get a new sparse tensor, but you cannot add a scalar value to a sparse tensor, as this would not return a sparse tensor:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">s</code> <code class="o">*</code> <code class="mf">42.0</code>
+<code class="go">&lt;tensorflow.python.framework.sparse_tensor.SparseTensor at 0x7f84a6749f10&gt;</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">s</code> <code class="o">+</code> <code class="mf">42.0</code>
+<code class="go">[...] TypeError: unsupported operand type(s) for +: 'SparseTensor' and 'float'</code></pre>
+</div>
+</section>
+<section data-pdf-bookmark="Tensor Arrays" data-type="sect1"><div class="sect1" id="idm45983064096752">
+<h2 id="sigil_toc_id_400">Tensor Arrays</h2>
+<p>A <code>tf.TensorArray</code> represents a list of tensors. <a data-primary="tensor arrays" data-type="indexterm" id="idm45983063967488"></a>This can be handy in dynamic models containing loops, to accumulate results and later compute some statistics. You can read or write tensors at any location in the array:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">array</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">TensorArray</code><code class="p">(</code><code class="n">dtype</code><code class="o">=</code><code class="n">tf</code><code class="o">.</code><code class="n">float32</code><code class="p">,</code> <code class="n">size</code><code class="o">=</code><code class="mi">3</code><code class="p">)</code>
+<code class="n">array</code> <code class="o">=</code> <code class="n">array</code><code class="o">.</code><code class="n">write</code><code class="p">(</code><code class="mi">0</code><code class="p">,</code> <code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">([</code><code class="mf">1.</code><code class="p">,</code> <code class="mf">2.</code><code class="p">]))</code>
+<code class="n">array</code> <code class="o">=</code> <code class="n">array</code><code class="o">.</code><code class="n">write</code><code class="p">(</code><code class="mi">1</code><code class="p">,</code> <code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">([</code><code class="mf">3.</code><code class="p">,</code> <code class="mf">10.</code><code class="p">]))</code>
+<code class="n">array</code> <code class="o">=</code> <code class="n">array</code><code class="o">.</code><code class="n">write</code><code class="p">(</code><code class="mi">2</code><code class="p">,</code> <code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">([</code><code class="mf">5.</code><code class="p">,</code> <code class="mf">7.</code><code class="p">]))</code>
+<code class="n">tensor1</code> <code class="o">=</code> <code class="n">array</code><code class="o">.</code><code class="n">read</code><code class="p">(</code><code class="mi">1</code><code class="p">)</code>  <code class="c1"># =&gt; returns (and zeros out!) tf.constant([3., 10.])</code></pre>
+<p>By default, reading an item also replaces it with a tensor of the same shape but full of zeros. You can set <code>clear_after_read</code> to <code>False</code> if you don’t want this.</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>When you write to the array, you must assign the output back to the array, as shown in this code example. If you don’t, although your code will work fine in eager mode, it will break in graph mode (these modes are discussed in <a data-type="xref" href="HOMLWSKT017.xhtml#tensorflow_chapter">Chapter 12</a>).</p>
+</div>
+<p>By default, a <code>TensorArray</code> has a fixed size that is set upon creation. Alternatively, you can set <code>size=0</code> and <code>dynamic_size=True</code> to let the array grow automatically when needed. However, this will hinder performance, so if you know the <code>size</code> in advance, it’s better to use a fixed-size array. You must also specify the <code>dtype</code>, and all elements must have the same shape as the first one written to the array.</p>
+<p>You can stack all the items into a regular tensor by calling the <code>stack()</code> method:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">array</code><code class="o">.</code><code class="n">stack</code><code class="p">()</code>
+<code class="go">&lt;tf.Tensor: shape=(3, 2), dtype=float32, numpy=</code>
+<code class="go">array([[1., 2.],</code>
+<code class="go">       [0., 0.],</code>
+<code class="go">       [5., 7.]], dtype=float32)&gt;</code></pre>
+</div>
+</section>
+<section data-pdf-bookmark="Sets" data-type="sect1"><div class="sect1" id="idm45983064019904">
+<h2 id="sigil_toc_id_401">Sets</h2>
+<p>TensorFlow supports sets of integers or strings (but not floats). It represents sets using regular tensors. <a data-primary="sets" data-type="indexterm" id="idm45983063819392"></a>For example, the set <code>{1, 5, 9}</code> is just represented as the tensor <code>[[1, 5, 9]]</code>. Note that the tensor must have at least two dimensions, and the sets must be in the last dimension. For example, <code>[[1, 5, 9], [2, 5, 11]]</code> is a tensor holding two independent sets: <code>{1, 5, 9}</code> and <code>{2, 5, 11}</code>.</p>
+<p>The <code>tf.sets</code> package contains several functions to manipulate sets. For example, let’s create two sets and compute their union (the result is a sparse tensor, so we call <code>to_dense()</code> to display it):</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">a</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">([[</code><code class="mi">1</code><code class="p">,</code> <code class="mi">5</code><code class="p">,</code> <code class="mi">9</code><code class="p">]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">b</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">([[</code><code class="mi">5</code><code class="p">,</code> <code class="mi">6</code><code class="p">,</code> <code class="mi">9</code><code class="p">,</code> <code class="mi">11</code><code class="p">]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">u</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">sets</code><code class="o">.</code><code class="n">union</code><code class="p">(</code><code class="n">a</code><code class="p">,</code> <code class="n">b</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">u</code>
+<code class="go">&lt;tensorflow.python.framework.sparse_tensor.SparseTensor at 0x132b60d30&gt;</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">tf</code><code class="o">.</code><code class="n">sparse</code><code class="o">.</code><code class="n">to_dense</code><code class="p">(</code><code class="n">u</code><code class="p">)</code>
+<code class="go">&lt;tf.Tensor: [...], numpy=array([[ 1,  5,  6,  9, 11]], dtype=int32)&gt;</code></pre>
+<p>You can also compute the union of multiple pairs of sets simultaneously. If some sets are shorter than others, you must pad them with a padding value, such as 0:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">a</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">([[</code><code class="mi">1</code><code class="p">,</code> <code class="mi">5</code><code class="p">,</code> <code class="mi">9</code><code class="p">],</code> <code class="p">[</code><code class="mi">10</code><code class="p">,</code> <code class="mi">0</code><code class="p">,</code> <code class="mi">0</code><code class="p">]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">b</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">constant</code><code class="p">([[</code><code class="mi">5</code><code class="p">,</code> <code class="mi">6</code><code class="p">,</code> <code class="mi">9</code><code class="p">,</code> <code class="mi">11</code><code class="p">],</code> <code class="p">[</code><code class="mi">13</code><code class="p">,</code> <code class="mi">0</code><code class="p">,</code> <code class="mi">0</code><code class="p">,</code> <code class="mi">0</code><code class="p">]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">u</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">sets</code><code class="o">.</code><code class="n">union</code><code class="p">(</code><code class="n">a</code><code class="p">,</code> <code class="n">b</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">tf</code><code class="o">.</code><code class="n">sparse</code><code class="o">.</code><code class="n">to_dense</code><code class="p">(</code><code class="n">u</code><code class="p">)</code>
+<code class="go">&lt;tf.Tensor: [...] numpy=array([[ 1,  5,  6,  9, 11],</code>
+<code class="go">                               [ 0, 10, 13,  0,  0]], dtype=int32)&gt;</code></pre>
+<p>If you prefer to use a different padding value, such as –1, then you must set <code>default_value=-1</code> (or your preferred value) when calling <code>to_dense()</code>.</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>The default <code>default_value</code> is 0, so when dealing with string sets, you must set this parameter (e.g., to an empty string).</p>
+</div>
+<p>Other functions available in <code>tf.sets</code> include <code>difference()</code>, <code>intersection()</code>, and <code>size()</code>, which are self-explanatory. If you want to check whether or not a set contains some given values, you can compute the intersection of that set and the values. If you want to add some values to a set, you can compute the union of the set and the values.</p>
+</div>
+</section>
+<section class="less_space pagebreak-before" data-pdf-bookmark="Queues" data-type="sect1"><div class="sect1" id="idm45983063587152">
+<h2 id="sigil_toc_id_402">Queues</h2>
+<p>A queue is a data structure to which you can push data records, and later pull them out. <a data-primary="queues" data-type="indexterm" id="idm45983063585136"></a>TensorFlow implements several types of queues in the <code>tf.queue</code> package. They used to be very important when implementing efficient data loading and preprocessing pipelines, but the tf.data API has essentially rendered them useless (except perhaps in some rare cases) because it is much simpler to use and provides all the tools you need to build efficient pipelines. For the sake of completeness, though, let’s take a quick look at them.</p>
+<p>The simplest kind of queue is the first-in, first-out (FIFO) queue. To build it, you need to specify the maximum number of records it can contain. <a data-primary="TensorFlow" data-secondary="tf.queue.FIFOQueue" data-type="indexterm" id="idm45983063583504"></a><a data-primary="data" data-secondary="enqueuing and dequeuing" data-type="indexterm" id="idm45983063582528"></a>Moreover, each record is a tuple of tensors, so you must specify the type of each tensor, and optionally their shapes. For example, the following code example creates a FIFO queue with a maximum of three records, each containing a tuple with a 32-bit integer and a string. Then it pushes two records to it, looks at the size (which is 2 at this point), and pulls a record out:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">q</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">queue</code><code class="o">.</code><code class="n">FIFOQueue</code><code class="p">(</code><code class="mi">3</code><code class="p">,</code> <code class="p">[</code><code class="n">tf</code><code class="o">.</code><code class="n">int32</code><code class="p">,</code> <code class="n">tf</code><code class="o">.</code><code class="n">string</code><code class="p">],</code> <code class="n">shapes</code><code class="o">=</code><code class="p">[(),</code> <code class="p">()])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">q</code><code class="o">.</code><code class="n">enqueue</code><code class="p">([</code><code class="mi">10</code><code class="p">,</code> <code class="sa">b</code><code class="s2">"windy"</code><code class="p">])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">q</code><code class="o">.</code><code class="n">enqueue</code><code class="p">([</code><code class="mi">15</code><code class="p">,</code> <code class="sa">b</code><code class="s2">"sunny"</code><code class="p">])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">q</code><code class="o">.</code><code class="n">size</code><code class="p">()</code>
+<code class="go">&lt;tf.Tensor: shape=(), dtype=int32, numpy=2&gt;</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">q</code><code class="o">.</code><code class="n">dequeue</code><code class="p">()</code>
+<code class="go">[&lt;tf.Tensor: shape=(), dtype=int32, numpy=10&gt;,</code>
+<code class="go"> &lt;tf.Tensor: shape=(), dtype=string, numpy=b'windy'&gt;]</code></pre>
+<p>It is also possible to enqueue and dequeue multiple records at once using <code>enqueue_many()</code> and <code>dequeue_many()</code> (to use <code>dequeue_many()</code>, you must specify the <code>shapes</code> argument when you create the queue, as we did previously):</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">q</code><code class="o">.</code><code class="n">enqueue_many</code><code class="p">([[</code><code class="mi">13</code><code class="p">,</code> <code class="mi">16</code><code class="p">],</code> <code class="p">[</code><code class="sa">b</code><code class="s1">'cloudy'</code><code class="p">,</code> <code class="sa">b</code><code class="s1">'rainy'</code><code class="p">]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">q</code><code class="o">.</code><code class="n">dequeue_many</code><code class="p">(</code><code class="mi">3</code><code class="p">)</code>
+<code class="go">[&lt;tf.Tensor: [...], numpy=array([15, 13, 16], dtype=int32)&gt;,</code>
+<code class="go"> &lt;tf.Tensor: [...], numpy=array([b'sunny', b'cloudy', b'rainy'], dtype=object)&gt;]</code></pre>
+<p>Other queue types include:</p>
+<dl>
+<dt><code>PaddingFIFOQueue</code></dt>
+<dd>
+<p>Same as <code>FIFOQueue</code>, but its <code>dequeue_many()</code> method supports dequeueing multiple records of different shapes. It automatically pads the shortest records to ensure all the records in the batch have the same shape.</p>
+</dd>
+<dt><code>PriorityQueue</code></dt>
+<dd>
+<p>A queue that dequeues records in a prioritized order. The priority must be a 64-bit integer included as the first element of each record. Surprisingly, records with a lower priority will be dequeued first. Records with the same priority will be dequeued in FIFO order.</p>
+</dd>
+<dt><code>RandomShuffleQueue</code></dt>
+<dd>
+<p>A queue whose records are dequeued in random order. This was useful to implement a shuffle buffer before tf.data existed.<a data-primary="" data-startref="ix_data_struct_appc" data-type="indexterm" id="idm45983063462576"></a><a data-primary="" data-startref="ix_tf_spec_data" data-type="indexterm" id="idm45983063461600"></a></p>
+</dd>
+</dl>
+<p>If a queue is already full and you try to enqueue another record, the <code>enqueue*()</code> method will freeze until a record is dequeued by another thread. Similarly, if a queue is empty and you try to dequeue a record, the <code>dequeue*()</code> method will freeze until records are pushed to the queue by another thread.</p>
+</div>
+</section>
+<div data-type="footnotes"><p data-type="footnote" id="idm45983064512688"><sup><a href="#idm45983064512688-marker">1</a></sup> If you are not familiar with Unicode code points, please check out <a href="https://homl.info/unicode"><em class="hyperlink">https://homl.info/unicode</em></a>.</p>
+</div>
+</div>
+</section>
+</div>
+</body>
+</html>

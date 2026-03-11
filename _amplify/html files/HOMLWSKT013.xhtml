@@ -1,0 +1,805 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+<title>9. Unsupervised Learning Techniques</title>
+<link href="../Styles/epub.css" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+<div id="sbo-rt-content"><section data-pdf-bookmark="Chapter 9. Unsupervised Learning Techniques" data-type="chapter" epub:type="chapter"><div class="chapter" id="unsupervised_learning_chapter">
+<h1><span class="label">Chapter 9. </span>Unsupervised Learning Techniques</h1>
+<p>Although most of the applications of machine learning today are based on supervised learning (and as a result, this is where most of the investments go to), the vast majority of the available data is unlabeled: we have the input features <strong>X</strong>, but we do not have the labels <strong>y</strong>. <a data-primary="unsupervised learning" data-type="indexterm" id="ix_unsup_learn_ch9"></a>The computer scientist Yann LeCun famously said that “if intelligence was a cake, unsupervised learning would be the cake, supervised learning would be the icing on the cake, and reinforcement learning would be the cherry on the cake.” In other words, there is a huge potential in unsupervised learning that we have only barely started to sink our teeth into.</p>
+<p>Say you want to create a system that will take a few pictures of each item on a manufacturing production line and detect which items are defective. You can fairly easily create a system that will take pictures automatically, and this might give you thousands of pictures every day. You can then build a reasonably large dataset in just a few weeks. But wait, there are no labels! If you want to train a regular binary classifier that will predict whether an item is defective or not, you will need to label every single picture as “defective” or “normal”. This will generally require human experts to sit down and manually go through all the pictures. This is a long, costly, and tedious task, so it will usually only be done on a small subset of the available pictures. As a result, the labeled dataset will be quite small, and the classifier’s performance will be disappointing. Moreover, every time the company makes any change to its products, the whole process will need to be started over from scratch. Wouldn’t it be great if the algorithm could just exploit the unlabeled data without needing humans to label every picture? Enter unsupervised learning.</p>
+<p class="pagebreak-before">In <a data-type="xref" href="HOMLWSKT012.xhtml#dimensionality_chapter">Chapter 8</a> we looked at the most common unsupervised learning task: dimensionality reduction. In this chapter we will look at a few more unsupervised tasks:</p>
+<dl>
+<dt>Clustering</dt>
+<dd>
+<p>The goal is to group similar instances together into <em>clusters</em>. <a data-primary="clustering algorithms" data-type="indexterm" id="ix_cluster_alg_ch9"></a>Clustering is a great tool for data analysis, customer segmentation, recommender systems, search engines, image segmentation, semi-supervised learning, dimensionality reduction, and more.</p>
+</dd>
+<dt>Anomaly detection (also called <em>outlier detection</em>)</dt>
+<dd>
+<p>The objective is to learn what “normal” data looks like, and then use that to detect abnormal instances. <a data-primary="outliers" data-type="indexterm" id="idm45983113935728"></a><a data-primary="inliers" data-type="indexterm" id="idm45983113935024"></a>These instances are called <em>anomalies</em>, or <em>outliers</em>, while the normal instances are called <em>inliers</em>. Anomaly detection is useful in a wide variety of applications, such as fraud detection, detecting defective products in manufacturing, identifying new trends in time series, or removing outliers from a dataset before training another model, which can significantly improve the performance of the resulting model.</p>
+</dd>
+<dt>Density estimation</dt>
+<dd>
+<p>This is the task of estimating the <em>probability density function</em> (PDF) of the random process that generated the dataset. <a data-primary="density estimation" data-type="indexterm" id="idm45983113931040"></a><a data-primary="PDF (probability density function)" data-type="indexterm" id="idm45983113930288"></a><a data-primary="probability density function (PDF)" data-type="indexterm" id="idm45983113929552"></a><a data-primary="unsupervised learning" data-secondary="density estimation" data-type="indexterm" id="idm45983113928864"></a>Density estimation is commonly used for anomaly detection: instances located in very low-density regions are likely to be anomalies. It is also useful for data analysis and visualization.</p>
+</dd>
+</dl>
+<p>Ready for some cake? We will start with two clustering algorithms, <em>k</em>-means and DBSCAN, then we’ll discuss Gaussian mixture models and see how they can be used for density estimation, clustering, and anomaly detection.</p>
+<section data-pdf-bookmark="Clustering Algorithms: k-means and DBSCAN" data-type="sect1"><div class="sect1" id="idm45983113926496">
+<h2 id="sigil_toc_id_157">Clustering Algorithms: k-means and DBSCAN</h2>
+<p>As you enjoy a hike in the mountains, you stumble upon a plant you have never seen before. You look around and you notice a few more. They are not identical, yet they are sufficiently similar for you to know that they most likely belong to the same species (or at least the same genus). You may need a botanist to tell you what species that is, but you certainly don’t need an expert to identify groups of similar-looking objects. This is called <em>clustering</em>: it is the task of identifying similar instances and assigning them to <em>clusters</em>, or groups of similar instances.</p>
+<p>Just like in classification, each instance gets assigned to a group. However, unlike classification, clustering is an unsupervised task. Consider <a data-type="xref" href="#classification_vs_clustering_plot">Figure 9-1</a>: on the left is the iris dataset (introduced in <a data-type="xref" href="HOMLWSKT008.xhtml#linear_models_chapter">Chapter 4</a>), where each instance’s species (i.e., its class) is represented with a different marker. It is a labeled dataset, for which classification algorithms such as logistic regression, SVMs, or random forest classifiers are well suited. On the right is the same dataset, but without the labels, so you cannot use a classification algorithm anymore. This is where clustering algorithms step in: many of them can easily detect the lower-left cluster. It is also quite easy to see with our own eyes, but it is not so obvious that the upper-right cluster is composed of two distinct subclusters. That said, the dataset has two additional features (sepal length and width) that are not represented here, and clustering algorithms can make good use of all features, so in fact they identify the three clusters fairly well (e.g., using a Gaussian mixture model, only 5 instances out of 150 are assigned to the wrong cluster).</p>
+<figure><div class="figure" id="classification_vs_clustering_plot">
+<img alt="mls3 0901" height="220" src="../Images/mls3_0901.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-1. </span>Classification (left) versus clustering (right)</h6>
+</div>
+</figure>
+<p>Clustering is used in a wide variety of applications, including:</p>
+<dl>
+<dt>Customer segmentation</dt>
+<dd>
+<p>You can cluster your customers based on their purchases and their activity on your website. <a data-primary="customer segmentation" data-type="indexterm" id="idm45983113916832"></a><a data-primary="clustering algorithms" data-secondary="applications for" data-type="indexterm" id="ix_cluster_alg_applic"></a>This is useful to understand who your customers are and what they need, so you can adapt your products and marketing campaigns to each segment. For example, customer segmentation can be useful in <em>recommender systems</em> to suggest content that other users in the same cluster enjoyed.</p>
+</dd>
+<dt>Data analysis</dt>
+<dd>
+<p>When you analyze a new dataset, it can be helpful to run a clustering algorithm, and then analyze each cluster separately.<a data-primary="data analysis, clustering for" data-type="indexterm" id="idm45983113913008"></a></p>
+</dd>
+<dt>Dimensionality reduction</dt>
+<dd>
+<p>Once a dataset has been clustered, it is usually possible to measure each instance’s <em>affinity</em> with each cluster; <a data-primary="dimensionality reduction" data-secondary="clustering" data-type="indexterm" id="idm45983113910448"></a><a data-primary="affinity function" data-type="indexterm" id="idm45983113909424"></a>affinity is any measure of how well an instance fits into a cluster. Each instance’s feature vector <strong>x</strong> can then be replaced with the vector of its cluster affinities. If there are <em>k</em> clusters, then this vector is <em>k</em>-dimensional. The new vector is typically much lower-dimensional than the original feature vector, but it can preserve enough information for further processing.</p>
+</dd>
+<dt>Feature engineering</dt>
+<dd>
+<p>The cluster affinities can often be useful as extra features. <a data-primary="feature engineering" data-type="indexterm" id="idm45983113905888"></a>For example, we used <em>k</em>-means in <a data-type="xref" href="HOMLWSKT006.xhtml#project_chapter">Chapter 2</a> to add geographic cluster affinity features to the California housing dataset, and they helped us get better performance.</p>
+</dd>
+<dt><em>Anomaly detection</em> (also called <em>outlier detection</em>)</dt>
+<dd>
+<p>Any instance that has a low affinity to all the clusters is likely to be an anomaly. <a data-primary="anomaly detection" data-secondary="clustering for" data-type="indexterm" id="idm45983113901584"></a>For example, if you have clustered the users of your website based on their behavior, you can detect users with unusual behavior, such as an unusual number of requests per second.</p>
+</dd>
+<dt>Semi-supervised learning</dt>
+<dd>
+<p>If you only have a few labels, you could perform clustering and propagate the labels to all the instances in the same cluster. <a data-primary="semi-supervised learning" data-type="indexterm" id="idm45983113898992"></a>This technique can greatly increase the number of labels available for a subsequent supervised learning algorithm, and thus improve its performance.</p>
+</dd>
+<dt>Search engines</dt>
+<dd>
+<p>Some search engines let you search for images that are similar to a reference image. <a data-primary="search engines, clustering for" data-type="indexterm" id="idm45983113896656"></a>To build such a system, you would first apply a clustering algorithm to all the images in your database; similar images would end up in the same cluster. Then when a user provides a reference image, all you’d need to do is use the trained clustering model to find this image’s cluster, and you could then simply return all the images from this cluster.</p>
+</dd>
+<dt>Image segmentation</dt>
+<dd>
+<p>By clustering pixels according to their color, then replacing each pixel’s color with the mean color of its cluster, it is possible to considerably reduce the number of different colors in an image. <a data-primary="clustering algorithms" data-secondary="image segmentation" data-type="indexterm" id="idm45983113894432"></a><a data-primary="image segmentation" data-type="indexterm" id="idm45983113893456"></a>Image segmentation is used in many object detection and tracking systems, as it makes it easier to detect the contour of each object.</p>
+</dd>
+</dl>
+<p>There is no universal definition of what a cluster is: it really depends on the context, and different algorithms will capture different kinds of clusters. <a data-primary="centroid, cluster" data-type="indexterm" id="idm45983113892272"></a>Some algorithms look for instances centered around a particular point, called a <em>centroid</em>. Others look for continuous regions of densely packed instances: these clusters can take on any shape. Some algorithms are hierarchical, looking for clusters of clusters. And the list goes on.</p>
+<p>In this section, we will look at two popular clustering algorithms, <em>k</em>-means and DBSCAN, and explore some of their applications, such as nonlinear dimensionality reduction, semi-supervised learning, and anomaly detection.<a data-primary="" data-startref="ix_cluster_alg_applic" data-type="indexterm" id="idm45983113889952"></a></p>
+<section data-pdf-bookmark="k-means" data-type="sect2"><div class="sect2" id="idm45983113888848">
+<h2 id="sigil_toc_id_158" class="sigil_not_in_toc">k-means</h2>
+<p>Consider the unlabeled dataset represented in <a data-type="xref" href="#blobs_plot">Figure 9-2</a>: you can clearly see five blobs of instances. <a data-primary="k-means algorithm" data-type="indexterm" id="ix_kmeans_alg"></a>The <em>k</em>-means algorithm is a simple algorithm capable of clustering this kind of dataset very quickly and efficiently, often in just a few iterations. It was proposed by Stuart Lloyd at Bell Labs in 1957 as a technique for pulse-code 
+<span class="keep-together">modulation,</span> but it was only <a href="https://homl.info/36">published</a> outside of the company in 1982.⁠<sup><a data-type="noteref" href="#idm45983113882688" id="idm45983113882688-marker">1</a></sup> In 1965, Edward W. Forgy had published virtually the same algorithm, so <em>k</em>-means is sometimes referred to as the Lloyd–Forgy algorithm.</p>
+<figure class="smallerseventy"><div class="figure" id="blobs_plot">
+<img alt="mls3 0902" height="286" src="../Images/mls3_0902.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-2. </span>An unlabeled dataset composed of five blobs of instances</h6>
+</div>
+</figure>
+<p>Let’s train a <em>k</em>-means clusterer on this dataset. It will try to find each blob’s center and assign each instance to the closest blob:<a data-primary="Scikit-Learn" data-secondary="sklearn.cluster.KMeans" data-type="indexterm" id="idm45983113877712"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.cluster</code> <code class="kn">import</code> <code class="n">KMeans</code>
+<code class="kn">from</code> <code class="nn">sklearn.datasets</code> <code class="kn">import</code> <code class="n">make_blobs</code>
+
+<code class="n">X</code><code class="p">,</code> <code class="n">y</code> <code class="o">=</code> <code class="n">make_blobs</code><code class="p">([</code><code class="o">...</code><code class="p">])</code>  <code class="c1"># make the blobs: y contains the cluster IDs, but we</code>
+                          <code class="c1"># will not use them; that's what we want to predict</code>
+<code class="n">k</code> <code class="o">=</code> <code class="mi">5</code>
+<code class="n">kmeans</code> <code class="o">=</code> <code class="n">KMeans</code><code class="p">(</code><code class="n">n_clusters</code><code class="o">=</code><code class="n">k</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">y_pred</code> <code class="o">=</code> <code class="n">kmeans</code><code class="o">.</code><code class="n">fit_predict</code><code class="p">(</code><code class="n">X</code><code class="p">)</code></pre>
+<p>Note that you have to specify the number of clusters <em>k</em> that the algorithm must find. In this example, it is pretty obvious from looking at the data that <em>k</em> should be set to 5, but in general it is not that easy. We will discuss this shortly.</p>
+<p>Each instance will be assigned to one of the five clusters. <a data-primary="labels" data-secondary="in clustering" data-secondary-sortas="clustering" data-type="indexterm" id="idm45983113810624"></a>In the context of clustering, an instance’s <em>label</em> is the index of the cluster to which the algorithm assigns this instance; this is not to be confused with the class labels in classification, which are used as targets (remember that clustering is an unsupervised learning task). The <code>KMeans</code> instance preserves the predicted labels of the instances it was trained on, available via the <code>labels_</code> instance variable:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">y_pred</code>
+<code class="go">array([4, 0, 1, ..., 2, 1, 0], dtype=int32)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">y_pred</code> <code class="ow">is</code> <code class="n">kmeans</code><code class="o">.</code><code class="n">labels_</code>
+<code class="go">True</code></pre>
+<p>We can also take a look at the five centroids that the algorithm found:<a data-primary="centroid, cluster" data-type="indexterm" id="idm45983113776912"></a></p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">kmeans</code><code class="o">.</code><code class="n">cluster_centers_</code>
+<code class="go">array([[-2.80389616,  1.80117999],</code>
+<code class="go">       [ 0.20876306,  2.25551336],</code>
+<code class="go">       [-2.79290307,  2.79641063],</code>
+<code class="go">       [-1.46679593,  2.28585348],</code>
+<code class="go">       [-2.80037642,  1.30082566]])</code></pre>
+<p>You can easily assign new instances to the cluster whose centroid is closest:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="kn">import</code> <code class="nn">numpy</code> <code class="k">as</code> <code class="nn">np</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">X_new</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">array</code><code class="p">([[</code><code class="mi">0</code><code class="p">,</code> <code class="mi">2</code><code class="p">],</code> <code class="p">[</code><code class="mi">3</code><code class="p">,</code> <code class="mi">2</code><code class="p">],</code> <code class="p">[</code><code class="o">-</code><code class="mi">3</code><code class="p">,</code> <code class="mi">3</code><code class="p">],</code> <code class="p">[</code><code class="o">-</code><code class="mi">3</code><code class="p">,</code> <code class="mf">2.5</code><code class="p">]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">kmeans</code><code class="o">.</code><code class="n">predict</code><code class="p">(</code><code class="n">X_new</code><code class="p">)</code>
+<code class="go">array([1, 1, 2, 2], dtype=int32)</code></pre>
+<p><a data-primary="decision boundaries" data-type="indexterm" id="idm45983113706592"></a>If you plot the cluster’s decision boundaries, you get a Voronoi tessellation: see <a data-type="xref" href="#voronoi_plot">Figure 9-3</a>, where each centroid is represented with an X.</p>
+<figure class="smallerseventy"><div class="figure" id="voronoi_plot">
+<img alt="mls3 0903" height="283" src="../Images/mls3_0903.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-3. </span>k-means decision boundaries (Voronoi tessellation)</h6>
+</div>
+</figure>
+<p>The vast majority of the instances were clearly assigned to the appropriate cluster, but a few instances were probably mislabeled, especially near the boundary between the top-left cluster and the central cluster. Indeed, the <em>k</em>-means algorithm does not behave very well when the blobs have very different diameters because all it cares about when assigning an instance to a cluster is the distance to the centroid.</p>
+<p>Instead of assigning each instance to a single cluster, which is called <em>hard clustering</em>, it can be useful to give each instance a score per cluster, which is called <em>soft clustering</em>. <a data-primary="hard clustering" data-type="indexterm" id="idm45983113686688"></a><a data-primary="soft clustering" data-type="indexterm" id="idm45983113685952"></a>The score can be the distance between the instance and the centroid or a similarity score (or affinity), such as the Gaussian radial basis function we used in <a data-type="xref" href="HOMLWSKT006.xhtml#project_chapter">Chapter 2</a>. In the <code>KMeans</code> class, the <code>transform()</code> method measures the distance from each instance to every centroid:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">kmeans</code><code class="o">.</code><code class="n">transform</code><code class="p">(</code><code class="n">X_new</code><code class="p">)</code><code class="o">.</code><code class="n">round</code><code class="p">(</code><code class="mi">2</code><code class="p">)</code>
+<code class="go">array([[2.81, 0.33, 2.9 , 1.49, 2.89],</code>
+<code class="go">       [5.81, 2.8 , 5.85, 4.48, 5.84],</code>
+<code class="go">       [1.21, 3.29, 0.29, 1.69, 1.71],</code>
+<code class="go">       [0.73, 3.22, 0.36, 1.55, 1.22]])</code></pre>
+<p>In this example, the first instance in <code>X_new</code> is located at a distance of about 2.81 from the first centroid, 0.33 from the second centroid, 2.90 from the third centroid, 1.49 from the fourth centroid, and 2.89 from the fifth centroid. If you have a high-dimensional dataset and you transform it this way, you end up with a <em>k</em>-dimensional dataset: this transformation can be a very efficient nonlinear dimensionality reduction technique. Alternatively, you can use these distances as extra features to train another model, as in <a data-type="xref" href="HOMLWSKT006.xhtml#project_chapter">Chapter 2</a>.</p>
+<section data-pdf-bookmark="The k-means algorithm" data-type="sect3"><div class="sect3" id="idm45983113623360">
+<h3 class="sigil_not_in_toc">The k-means algorithm</h3>
+<p>So, how does the algorithm work? Well, suppose you were given the centroids. <a data-primary="centroid, cluster" data-type="indexterm" id="ix_centroid_cluster"></a><a data-primary="k-means algorithm" data-secondary="workings of" data-type="indexterm" id="ix_kmeans_workings"></a>You could easily label all the instances in the dataset by assigning each of them to the cluster whose centroid is closest. Conversely, if you were given all the instance labels, you could easily locate each cluster’s centroid by computing the mean of the instances in that cluster. But you are given neither the labels nor the centroids, so how can you proceed? Start by placing the centroids randomly (e.g., by picking <em>k</em> instances at random from the dataset and using their locations as centroids). Then label the instances, update the centroids, label the instances, update the centroids, and so on until the centroids stop moving. The algorithm is guaranteed to converge in a finite number of steps (usually quite small). That’s because the mean squared distance between the instances and their closest centroids can only go down at each step, and since it cannot be negative, it’s guaranteed to converge.</p>
+<p>You can see the algorithm in action in <a data-type="xref" href="#kmeans_algorithm_plot">Figure 9-4</a>: the centroids are initialized randomly (top left), then the instances are labeled (top right), then the centroids are updated (center left), the instances are relabeled (center right), and so on. As you can see, in just three iterations the algorithm has reached a clustering that seems close to optimal.</p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>The computational <a data-primary="computational complexity" data-secondary="k-means algorithm" data-type="indexterm" id="idm45983113616640"></a>complexity of the algorithm is generally linear with regard to the number of instances <em>m</em>, the number of clusters <em>k</em>, and the number of dimensions <em>n</em>. However, this is only true when the data has a clustering structure. If it does not, then in the worst-case scenario the complexity can increase exponentially with the number of instances. In practice, this rarely happens, and <em>k</em>-means is generally one of the fastest clustering algorithms.</p>
+</div>
+<figure><div class="figure" id="kmeans_algorithm_plot">
+<img alt="mls3 0904" height="474" src="../Images/mls3_0904.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-4. </span>The <em>k</em>-means algorithm</h6>
+</div>
+</figure>
+<p>Although the algorithm is guaranteed to converge, it may not converge to the right solution (i.e., it may converge to a local optimum): whether it does or not depends on the centroid initialization. <a data-type="xref" href="#kmeans_variability_plot">Figure 9-5</a> shows two suboptimal solutions that the algorithm can converge to if you are not lucky with the random initialization step.</p>
+<figure><div class="figure" id="kmeans_variability_plot">
+<img alt="mls3 0905" height="177" src="../Images/mls3_0905.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-5. </span>Suboptimal solutions due to unlucky centroid initializations</h6>
+</div>
+</figure>
+<p>Let’s take a look at a few ways you can mitigate this risk by improving the centroid <span class="keep-together">initialization</span>.<a data-primary="" data-startref="ix_kmeans_workings" data-type="indexterm" id="idm45983113607152"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Centroid initialization methods" data-type="sect3"><div class="sect3" id="idm45983113590048">
+<h3 class="sigil_not_in_toc">Centroid initialization methods</h3>
+<p>If you happen to know approximately where the centroids should be (e.g., if you ran another clustering algorithm earlier), then you can set the <code>init</code> hyperparameter to a NumPy array containing the list of centroids, and set <code>n_init</code> to <code>1</code>:<a data-primary="k-means algorithm" data-secondary="centroid initialization methods" data-type="indexterm" id="ix_kmeans_alg_centroid"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">good_init</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">array</code><code class="p">([[</code><code class="o">-</code><code class="mi">3</code><code class="p">,</code> <code class="mi">3</code><code class="p">],</code> <code class="p">[</code><code class="o">-</code><code class="mi">3</code><code class="p">,</code> <code class="mi">2</code><code class="p">],</code> <code class="p">[</code><code class="o">-</code><code class="mi">3</code><code class="p">,</code> <code class="mi">1</code><code class="p">],</code> <code class="p">[</code><code class="o">-</code><code class="mi">1</code><code class="p">,</code> <code class="mi">2</code><code class="p">],</code> <code class="p">[</code><code class="mi">0</code><code class="p">,</code> <code class="mi">2</code><code class="p">]])</code>
+<code class="n">kmeans</code> <code class="o">=</code> <code class="n">KMeans</code><code class="p">(</code><code class="n">n_clusters</code><code class="o">=</code><code class="mi">5</code><code class="p">,</code> <code class="n">init</code><code class="o">=</code><code class="n">good_init</code><code class="p">,</code> <code class="n">n_init</code><code class="o">=</code><code class="mi">1</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">kmeans</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">)</code></pre>
+<p>Another solution is to run the algorithm multiple times with different random initializations and keep the best solution. The number of random initializations is controlled by the <code>n_init</code> hyperparameter: by default it is equal to <code>10</code>, which means that the whole algorithm described earlier runs 10 times when you call <code>fit()</code>, and Scikit-Learn keeps the best solution. But how exactly does it know which solution is the best? It uses a performance metric! <a data-primary="inertia, model" data-type="indexterm" id="idm45983113552208"></a>That metric is called the model’s <em>inertia</em>, which is the sum of the squared distances between the instances and their closest centroids. It is roughly equal to 219.4 for the model on the left in <a data-type="xref" href="#kmeans_variability_plot">Figure 9-5</a>, 258.6 for the model on the right in <a data-type="xref" href="#kmeans_variability_plot">Figure 9-5</a>, and only 211.6 for the model in <a data-type="xref" href="#voronoi_plot">Figure 9-3</a>. The <code>KMeans</code> class runs the algorithm <code>n_init</code> times and keeps the model with the lowest inertia. In this example, the model in <a data-type="xref" href="#voronoi_plot">Figure 9-3</a> will be selected (unless we are very unlucky with <code>n_init</code> consecutive random initializations). If you are curious, a model’s inertia is accessible via the <code>inertia_</code> instance variable:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">kmeans</code><code class="o">.</code><code class="n">inertia_</code>
+<code class="go">211.59853725816836</code></pre>
+<p>The <code>score()</code> method returns the negative inertia (it’s negative because a predictor’s <code>score()</code> method must always respect Scikit-Learn’s “greater is better” rule: if a predictor is better than another, its <code>score()</code> method should return a greater score):</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">kmeans</code><code class="o">.</code><code class="n">score</code><code class="p">(</code><code class="n">X</code><code class="p">)</code>
+<code class="go">-211.5985372581684</code></pre>
+<p>An important improvement to the <em>k</em>-means algorithm, <em>k-means++</em>, was proposed in a <a href="https://homl.info/37">2006 paper</a> by David Arthur and Sergei Vassilvitskii.⁠<sup><a data-type="noteref" href="#idm45983113465888" id="idm45983113465888-marker">2</a></sup> They introduced a smarter initialization step that tends to select centroids that are distant from one another, and this improvement makes the <em>k</em>-means algorithm much less likely to converge to a suboptimal solution. The paper showed that the additional computation required for the smarter initialization step is well worth it because it makes it possible to drastically reduce the number of times the algorithm needs to be run to find the optimal solution. <a data-primary="k-means++" data-type="indexterm" id="idm45983113440256"></a>The <em>k</em>-means++ initialization algorithm works like this:</p>
+<ol>
+<li>
+<p>Take one centroid <strong>c</strong><sup>(1)</sup>, chosen uniformly at random from the dataset.</p>
+</li>
+<li>
+<p>Take a new centroid <strong>c</strong><sup>(<em>i</em>)</sup>, choosing an instance <strong>x</strong><sup>(<em>i</em>)</sup> with probability <math xmlns="http://www.w3.org/1998/Math/MathML"><mi>D</mi><msup><mfenced><msup><mi mathvariant="bold">x</mi><mrow><mo>(</mo><mi>i</mi><mo>)</mo></mrow></msup></mfenced><mn>2</mn></msup></math> / <math xmlns="http://www.w3.org/1998/Math/MathML"><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>m</mi></munderover><mi>D</mi><msup><mfenced><msup><mi mathvariant="bold">x</mi><mrow><mo>(</mo><mi>j</mi><mo>)</mo></mrow></msup></mfenced><mn>2</mn></msup></math>, where D(<strong>x</strong><sup>(<em>i</em>)</sup>) is the distance between the instance <strong>x</strong><sup>(<em>i</em>)</sup> and the closest centroid that was already chosen. This probability distribution ensures that instances farther away from already chosen centroids are much more likely to be selected as centroids.</p>
+</li>
+<li>
+<p>Repeat the previous step until all <em>k</em> centroids have been chosen.</p>
+</li>
+</ol>
+<p>The <code>KMeans</code> class uses this initialization method by default.<a data-primary="" data-startref="ix_kmeans_alg_centroid" data-type="indexterm" id="idm45983113401536"></a><a data-primary="" data-startref="ix_centroid_cluster" data-type="indexterm" id="idm45983113400560"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Accelerated k-means and mini-batch k-means" data-type="sect3"><div class="sect3" id="idm45983113399360">
+<h3 class="sigil_not_in_toc">Accelerated k-means and mini-batch k-means</h3>
+<p>Another improvement to the <em>k</em>-means algorithm was proposed in a <a href="https://homl.info/38">2003 paper</a> by Charles Elkan.⁠<sup><a data-type="noteref" href="#idm45983113396528" id="idm45983113396528-marker">3</a></sup> <a data-primary="accelerated k-means" data-type="indexterm" id="idm45983113395392"></a><a data-primary="k-means algorithm" data-secondary="accelerated k-means" data-type="indexterm" id="idm45983113394688"></a>On some large datasets with many clusters, the algorithm can be accelerated by avoiding many unnecessary distance calculations. Elkan achieved this by exploiting the triangle inequality (i.e., that a straight line is always the shortest distance between two points⁠<sup><a data-type="noteref" href="#idm45983113393328" id="idm45983113393328-marker">4</a></sup>) and by keeping track of lower and upper bounds for distances between instances and centroids. However, Elkan’s algorithm does not always accelerate training, and sometimes it can even slow down training significantly; it depends on the dataset. Still, if you want to give it a try, set <code>algorithm="elkan"</code>.</p>
+<p>Yet another important variant of the <em>k</em>-means algorithm was proposed in a <a href="https://homl.info/39">2010 paper</a> by David Sculley.⁠<sup><a data-type="noteref" href="#idm45983113390368" id="idm45983113390368-marker">5</a></sup> <a data-primary="k-means algorithm" data-secondary="mini-batch k-means" data-type="indexterm" id="idm45983113389168"></a><a data-primary="mini-batch k-means" data-type="indexterm" id="idm45983113388192"></a>Instead of using the full dataset at each iteration, the algorithm is capable of using mini-batches, moving the centroids just slightly at each iteration. This speeds up the algorithm (typically by a factor of three to four) and makes it possible to cluster huge datasets that do not fit in memory. Scikit-Learn implements this algorithm in the <code>MiniBatchKMeans</code> class, which you can use just like the <code>KMeans</code> class:<a data-primary="Scikit-Learn" data-secondary="sklearn.cluster.MiniBatchKMeans" data-type="indexterm" id="idm45983113386528"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.cluster</code> <code class="kn">import</code> <code class="n">MiniBatchKMeans</code>
+
+<code class="n">minibatch_kmeans</code> <code class="o">=</code> <code class="n">MiniBatchKMeans</code><code class="p">(</code><code class="n">n_clusters</code><code class="o">=</code><code class="mi">5</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">minibatch_kmeans</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">)</code></pre>
+<p>If the dataset does not fit in memory, the simplest option is to use the <code>memmap</code> class, as we did for incremental PCA in <a data-type="xref" href="HOMLWSKT012.xhtml#dimensionality_chapter">Chapter 8</a>. Alternatively, you can pass one mini-batch at a time to the <code>partial_fit()</code> method, but this will require much more work, since you will need to perform multiple initializations and select the best one yourself.</p>
+<p>Although the mini-batch <em>k</em>-means algorithm is much faster than the regular <em>k</em>-means algorithm, its inertia is generally slightly worse. You can see this in <a data-type="xref" href="#minibatch_kmeans_vs_kmeans_plot">Figure 9-6</a>: the plot on the left compares the inertias of mini-batch <em>k</em>-means and regular <em>k</em>-means models trained on the previous five-blobs dataset using various numbers of clusters <em>k</em>. <a data-primary="inertia, model" data-type="indexterm" id="idm45983113353360"></a>The difference between the two curves is small, but visible. In the plot on the right, you can see that mini-batch <em>k</em>-means is roughly 3.5 times faster than regular <em>k</em>-means on this dataset.</p>
+<figure><div class="figure" id="minibatch_kmeans_vs_kmeans_plot">
+<img alt="mls3 0906" height="225" src="../Images/mls3_0906.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-6. </span>Mini-batch <em>k</em>-means has a higher inertia than <em>k</em>-means (left) but it is much faster (right), especially as <em>k</em> increases</h6>
+</div>
+</figure>
+</div>
+</section>
+<section data-pdf-bookmark="Finding the optimal number of clusters" data-type="sect3"><div class="sect3" id="idm45983113348320">
+<h3 class="sigil_not_in_toc">Finding the optimal number of clusters</h3>
+<p>So far, we’ve set the number of clusters <em>k</em> to 5 because it was obvious by looking at the data that this was the correct number of clusters. <a data-primary="k-means algorithm" data-secondary="finding optimal number of clusters" data-type="indexterm" id="ix_kmeans_alg_num_cluster"></a>But in general, it won’t be so easy to know how to set <em>k</em>, and the result might be quite bad if you set it to the wrong value. As you can see in <a data-type="xref" href="#bad_n_clusters_plot">Figure 9-7</a>, for this dataset setting <em>k</em> to 3 or 8 results in fairly bad models.</p>
+<p>You might be thinking that you could just pick the model with the lowest inertia. Unfortunately, it is not that simple. The inertia for <em>k</em>=3 is about 653.2, which is much higher than for <em>k</em>=5 (211.6). But with <em>k</em>=8, the inertia is just 119.1. The inertia is not a good performance metric when trying to choose <em>k</em> because it keeps getting lower as we increase <em>k</em>. Indeed, the more clusters there are, the closer each instance will be to its closest centroid, and therefore the lower the inertia will be. Let’s plot the inertia as a function of <em>k</em>. When we do this, the curve often contains an inflexion point called the <em>elbow</em> (see <a data-type="xref" href="#inertia_vs_k_plot">Figure 9-8</a>).</p>
+<figure><div class="figure" id="bad_n_clusters_plot">
+<img alt="mls3 0907" height="176" src="../Images/mls3_0907.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-7. </span>Bad choices for the number of clusters: when k is too small, separate clusters get merged (left), and when k is too large, some clusters get chopped into multiple pieces (right)</h6>
+</div>
+</figure>
+<figure class="smallerseventy"><div class="figure" id="inertia_vs_k_plot">
+<img alt="mls3 0908" height="245" src="../Images/mls3_0908.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-8. </span>Plotting the inertia as a function of the number of clusters <em>k</em></h6>
+</div>
+</figure>
+<p>As you can see, the inertia drops very quickly as we increase <em>k</em> up to 4, but then it decreases much more slowly as we keep increasing <em>k</em>. This curve has roughly the shape of an arm, and there is an elbow at <em>k</em> = 4. So, if we did not know better, we might think 4 was a good choice: any lower value would be dramatic, while any higher value would not help much, and we might just be splitting perfectly good clusters in half for no good reason.</p>
+<p>This technique for choosing the best value for the number of clusters is rather coarse. A more precise (but also more computationally expensive) approach is to use the <span class="keep-together"><em>silhouette score</em></span>, which is the mean <em>silhouette coefficient</em> over all the instances. <a data-primary="silhouette coefficient" data-type="indexterm" id="idm45983113307888"></a>An <span class="keep-together">instance’s</span> silhouette coefficient is equal to  (<em>b</em> – <em>a</em>) / max(<em>a</em>, <em>b</em>), where <em>a</em> is the mean distance to the other instances in the same cluster (i.e., the mean intra-cluster distance) and <em>b</em> is the mean nearest-cluster distance (i.e., the mean distance to the instances of the next closest cluster, defined as the one that minimizes <em>b</em>, excluding the instance’s own cluster). The silhouette coefficient can vary between –1 and +1. A coefficient close to +1 means that the instance is well inside its own cluster and far from other clusters, while a coefficient close to 0 means that it is close to a cluster boundary; finally, a coefficient close to –1 means that the instance may have been assigned to the wrong cluster.</p>
+<p>To compute the silhouette score, you can use Scikit-Learn’s <code>silhouette_score()</code> function, giving it all the instances in the dataset and the labels they were assigned:<a data-primary="Scikit-Learn" data-secondary="sklearn.metrics.silhouette_score()" data-type="indexterm" id="idm45983113302304"></a></p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="kn">from</code> <code class="nn">sklearn.metrics</code> <code class="kn">import</code> <code class="n">silhouette_score</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">silhouette_score</code><code class="p">(</code><code class="n">X</code><code class="p">,</code> <code class="n">kmeans</code><code class="o">.</code><code class="n">labels_</code><code class="p">)</code>
+<code class="go">0.655517642572828</code></pre>
+<p>Let’s compare the silhouette scores for different numbers of clusters (see <a data-type="xref" href="#silhouette_score_vs_k_plot">Figure 9-9</a>).</p>
+<figure class="width-75"><div class="figure" id="silhouette_score_vs_k_plot">
+<img alt="mls3 0909" height="202" src="../Images/mls3_0909.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-9. </span>Selecting the number of clusters <em>k</em> using the silhouette score</h6>
+</div>
+</figure>
+<p>As you can see, this visualization is much richer than the previous one: although it confirms that <em>k</em> = 4 is a very good choice, it also highlights the fact that <em>k</em> = 5 is quite good as well, and much better than <em>k</em> = 6 or 7. This was not visible when comparing inertias.</p>
+<p>An even more informative visualization is obtained when we plot every instance’s silhouette coefficient, sorted by the clusters they are assigned to and by the value of the coefficient. <a data-primary="silhouette diagram" data-type="indexterm" id="idm45983113270640"></a>This is called a <em>silhouette diagram</em> (see <a data-type="xref" href="#silhouette_analysis_plot">Figure 9-10</a>). Each diagram contains one knife shape per cluster. The shape’s height indicates the number of instances in the cluster, and its width represents the sorted silhouette coefficients of the instances in the cluster (wider is better).</p>
+<p>The vertical dashed lines represent the mean silhouette score for each number of clusters. When most of the instances in a cluster have a lower coefficient than this score (i.e., if many of the instances stop short of the dashed line, ending to the left of it), then the cluster is rather bad since this means its instances are much too close to other clusters. Here we can see that when <em>k</em> = 3 or 6, we get bad clusters. But when <em>k</em> = 4 or 5, the clusters look pretty good: most instances extend beyond the dashed line, to the right and closer to 1.0. When <em>k</em> = 4, the cluster at index 1 (the second from the bottom) is rather big. When <em>k</em> = 5, all clusters have similar sizes. So, even though the overall silhouette score from <em>k</em> = 4 is slightly greater than for <em>k</em> = 5, it seems like a good idea to use <em>k</em> = 5 to get clusters of similar sizes.<a data-primary="" data-startref="ix_kmeans_alg_num_cluster" data-type="indexterm" id="idm45983113264928"></a></p>
+<figure><div class="figure" id="silhouette_analysis_plot">
+<img alt="mls3 0910" height="485" src="../Images/mls3_0910.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-10. </span>Analyzing the silhouette diagrams for various values of <em>k</em></h6>
+</div>
+</figure>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Limits of k-means" data-type="sect2"><div class="sect2" id="idm45983113888064">
+<h2 id="sigil_toc_id_159" class="sigil_not_in_toc">Limits of k-means</h2>
+<p>Despite its many merits, most notably being fast and scalable, <em>k</em>-means is not perfect. <a data-primary="k-means algorithm" data-secondary="limitations of" data-type="indexterm" id="idm45983113260256"></a>As we saw, it is necessary to run the algorithm several times to avoid suboptimal solutions, plus you need to specify the number of clusters, which can be quite a hassle. Moreover, <em>k</em>-means does not behave very well when the clusters have varying sizes, different densities, or nonspherical shapes. For example, <a data-type="xref" href="#bad_kmeans_plot">Figure 9-11</a> shows how <em>k</em>-means clusters a dataset containing three ellipsoidal clusters of different dimensions, densities, and orientations.</p>
+<p>As you can see, neither of these solutions is any good. The solution on the left is better, but it still chops off 25% of the middle cluster and assigns it to the cluster on the right. The solution on the right is just terrible, even though its inertia is lower. So, depending on the data, different clustering algorithms may perform better. <a data-primary="Gaussian mixture model (GMM)" data-secondary="and k-means limitations" data-secondary-sortas="k-means limitations" data-type="indexterm" id="idm45983113242112"></a>On these types of elliptical clusters, Gaussian mixture models work great.</p>
+<figure><div class="figure" id="bad_kmeans_plot">
+<img alt="mls3 0911" height="177" src="../Images/mls3_0911.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-11. </span>k-means fails to cluster these ellipsoidal blobs properly</h6>
+</div>
+</figure>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>It is important to scale the input features (see <a data-type="xref" href="HOMLWSKT006.xhtml#project_chapter">Chapter 2</a>) before you run <em>k</em>-means, or the clusters may be very stretched and <em>k</em>-means will perform poorly. Scaling the features does not guarantee that all the clusters will be nice and spherical, but it generally helps <em>k</em>-means.</p>
+</div>
+<p>Now let’s look at a few ways we can benefit from clustering. We will use <em>k</em>-means, but feel free to experiment with other clustering algorithms.<a data-primary="" data-startref="ix_kmeans_alg" data-type="indexterm" id="idm45983113234720"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Using Clustering for Image Segmentation" data-type="sect2"><div class="sect2" id="idm45983113233616">
+<h2 id="sigil_toc_id_160" class="sigil_not_in_toc">Using Clustering for Image Segmentation</h2>
+<p><em>Image segmentation</em> is the task of partitioning an image into multiple segments. <a data-primary="clustering algorithms" data-secondary="image segmentation" data-type="indexterm" id="ix_cluster_alg_image_seg"></a><a data-primary="image segmentation" data-type="indexterm" id="ix_image_segment"></a>There are several variants:</p>
+<ul>
+<li>
+<p>In <em>color segmentation</em>, pixels with a similar color get assigned to the same segment. <a data-primary="color segmentation, images" data-type="indexterm" id="idm45983113227888"></a>This is sufficient in many applications. For example, if you want to analyze satellite images to measure how much total forest area there is in a region, color segmentation may be just fine.</p>
+</li>
+<li>
+<p>In <em>semantic segmentation</em>, all pixels that are part of the same object type get assigned to the same segment. <a data-primary="images, classifying and generating" data-secondary="semantic segmentation" data-type="indexterm" id="idm45983113225680"></a><a data-primary="semantic segmentation" data-type="indexterm" id="idm45983113224688"></a><a data-primary="convolutional neural networks (CNNs)" data-secondary="semantic segmentation" data-type="indexterm" id="idm45983113224016"></a>For example, in a self-driving car’s vision system, all pixels that are part of a pedestrian’s image might be assigned to the “pedestrian” segment (there would be one segment containing all the pedestrians).</p>
+</li>
+<li>
+<p>In <em>instance segmentation</em>, all pixels that are part of the same individual object are assigned to the same segment. <a data-primary="instance segmentation" data-type="indexterm" id="idm45983113221440"></a>In this case there would be a different segment for each pedestrian.</p>
+</li>
+</ul>
+<p class="pagebreak-before">The state of the art in semantic or instance segmentation today is achieved using complex architectures based on convolutional neural networks (see <a data-type="xref" href="HOMLWSKT019.xhtml#cnn_chapter">Chapter 14</a>). In this chapter we are going to focus on the (much simpler) color segmentation task, using <em>k</em>-means.</p>
+<p>We’ll start by importing the Pillow package (successor to the Python Imaging Library, PIL), which we’ll then use to load the <em>ladybug.png</em> image (see the upper-left image in <a data-type="xref" href="#image_segmentation_plot">Figure 9-12</a>), assuming it’s located at <code>filepath</code>:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="kn">import</code> <code class="nn">PIL</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">image</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">asarray</code><code class="p">(</code><code class="n">PIL</code><code class="o">.</code><code class="n">Image</code><code class="o">.</code><code class="n">open</code><code class="p">(</code><code class="n">filepath</code><code class="p">))</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">image</code><code class="o">.</code><code class="n">shape</code>
+<code class="go">(533, 800, 3)</code></pre>
+<p>The image is represented as a 3D array. The first dimension’s size is the height; the second is the width; and the third is the number of color channels, in this case red, green, and blue (RGB). In other words, for each pixel there is a 3D vector containing the intensities of red, green, and blue as unsigned 8-bit integers between 0 and 255. Some images may have fewer channels (such as grayscale images, which only have one), and some images may have more channels (such as images with an additional <em>alpha channel</em> for transparency, or satellite images, which often contain channels for additional light frequencies (like infrared).</p>
+<p>The following code reshapes the array to get a long list of RGB colors, then it clusters these colors using <em>k</em>-means with eight clusters. It creates a <code>segmented_img</code> array containing the nearest cluster center for each pixel (i.e., the mean color of each pixel’s cluster), and lastly it reshapes this array to the original image shape. The third line uses advanced NumPy indexing; for example, if the first 10 labels in <code>kmeans_.labels_</code> are equal to 1, then the first 10 colors in <code>segmented_img</code> are equal to <code>kmeans.cluster_centers_[1]</code>:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">X</code> <code class="o">=</code> <code class="n">image</code><code class="o">.</code><code class="n">reshape</code><code class="p">(</code><code class="o">-</code><code class="mi">1</code><code class="p">,</code> <code class="mi">3</code><code class="p">)</code>
+<code class="n">kmeans</code> <code class="o">=</code> <code class="n">KMeans</code><code class="p">(</code><code class="n">n_clusters</code><code class="o">=</code><code class="mi">8</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">)</code>
+<code class="n">segmented_img</code> <code class="o">=</code> <code class="n">kmeans</code><code class="o">.</code><code class="n">cluster_centers_</code><code class="p">[</code><code class="n">kmeans</code><code class="o">.</code><code class="n">labels_</code><code class="p">]</code>
+<code class="n">segmented_img</code> <code class="o">=</code> <code class="n">segmented_img</code><code class="o">.</code><code class="n">reshape</code><code class="p">(</code><code class="n">image</code><code class="o">.</code><code class="n">shape</code><code class="p">)</code></pre>
+<p>This outputs the image shown in the upper right of <a data-type="xref" href="#image_segmentation_plot">Figure 9-12</a>. You can experiment with various numbers of clusters, as shown in the figure. When you use fewer than eight clusters, notice that the ladybug’s flashy red color fails to get a cluster of its own: it gets merged with colors from the environment. This is because <em>k</em>-means prefers clusters of similar sizes. The ladybug is small—much smaller than the rest of the image—so even though its color is flashy, <em>k</em>-means fails to dedicate a cluster to it.</p>
+<figure><div class="figure" id="image_segmentation_plot">
+<img alt="mls3 0912" height="300" src="../Images/mls3_0912.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-12. </span>Image segmentation using <em>k</em>-means with various numbers of color clusters</h6>
+</div>
+</figure>
+<p>That wasn’t too hard, was it? Now let’s look at another application of clustering.<a data-primary="" data-startref="ix_image_segment" data-type="indexterm" id="idm45983113081680"></a><a data-primary="" data-startref="ix_cluster_alg_image_seg" data-type="indexterm" id="idm45983113080704"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Using Clustering for Semi-Supervised Learning" data-type="sect2"><div class="sect2" id="idm45983113233024">
+<h2 id="sigil_toc_id_161" class="sigil_not_in_toc">Using Clustering for Semi-Supervised Learning</h2>
+<p>Another use case for clustering is in semi-supervised learning, when we have plenty of unlabeled instances and very few labeled instances. <a data-primary="clustering algorithms" data-secondary="semi-supervised learning with" data-type="indexterm" id="ix_cluster_alg_semisup"></a><a data-primary="semi-supervised learning" data-type="indexterm" id="ix_semisup_learn"></a>In this section, we’ll use the digits dataset, which is a simple MNIST-like dataset containing 1,797 grayscale 8 × 8 images representing the digits 0 to 9. First, let’s load and split the dataset (it’s already shuffled):</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.datasets</code> <code class="kn">import</code> <code class="n">load_digits</code>
+
+<code class="n">X_digits</code><code class="p">,</code> <code class="n">y_digits</code> <code class="o">=</code> <code class="n">load_digits</code><code class="p">(</code><code class="n">return_X_y</code><code class="o">=</code><code class="kc">True</code><code class="p">)</code>
+<code class="n">X_train</code><code class="p">,</code> <code class="n">y_train</code> <code class="o">=</code> <code class="n">X_digits</code><code class="p">[:</code><code class="mi">1400</code><code class="p">],</code> <code class="n">y_digits</code><code class="p">[:</code><code class="mi">1400</code><code class="p">]</code>
+<code class="n">X_test</code><code class="p">,</code> <code class="n">y_test</code> <code class="o">=</code> <code class="n">X_digits</code><code class="p">[</code><code class="mi">1400</code><code class="p">:],</code> <code class="n">y_digits</code><code class="p">[</code><code class="mi">1400</code><code class="p">:]</code></pre>
+<p>We will pretend we only have labels for 50 instances. To get a baseline performance, let’s train a logistic regression model on these 50 labeled instances:<a data-primary="Scikit-Learn" data-secondary="sklearn.linear_model.LogisticRegression" data-type="indexterm" id="idm45983113044400"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.linear_model</code> <code class="kn">import</code> <code class="n">LogisticRegression</code>
+
+<code class="n">n_labeled</code> <code class="o">=</code> <code class="mi">50</code>
+<code class="n">log_reg</code> <code class="o">=</code> <code class="n">LogisticRegression</code><code class="p">(</code><code class="n">max_iter</code><code class="o">=</code><code class="mi">10_000</code><code class="p">)</code>
+<code class="n">log_reg</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_train</code><code class="p">[:</code><code class="n">n_labeled</code><code class="p">],</code> <code class="n">y_train</code><code class="p">[:</code><code class="n">n_labeled</code><code class="p">])</code></pre>
+<p class="pagebreak-before">We can then measure the accuracy of this model on the test set (note that the test set must be labeled):</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">log_reg</code><code class="o">.</code><code class="n">score</code><code class="p">(</code><code class="n">X_test</code><code class="p">,</code> <code class="n">y_test</code><code class="p">)</code>
+<code class="go">0.7481108312342569</code></pre>
+<p>The model’s accuracy is just 74.8%. That’s not great: indeed, if you try training the model on the full training set, you will find that it will reach about 90.7% accuracy. Let’s see how we can do better. First, let’s cluster the training set into 50 clusters. Then, for each cluster, we’ll find the image closest to the centroid. <a data-primary="images, classifying and generating" data-secondary="representative images" data-type="indexterm" id="idm45983112931328"></a>We’ll call these images the <em>representative images</em>:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">k</code> <code class="o">=</code> <code class="mi">50</code>
+<code class="n">kmeans</code> <code class="o">=</code> <code class="n">KMeans</code><code class="p">(</code><code class="n">n_clusters</code><code class="o">=</code><code class="n">k</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">X_digits_dist</code> <code class="o">=</code> <code class="n">kmeans</code><code class="o">.</code><code class="n">fit_transform</code><code class="p">(</code><code class="n">X_train</code><code class="p">)</code>
+<code class="n">representative_digit_idx</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">argmin</code><code class="p">(</code><code class="n">X_digits_dist</code><code class="p">,</code> <code class="n">axis</code><code class="o">=</code><code class="mi">0</code><code class="p">)</code>
+<code class="n">X_representative_digits</code> <code class="o">=</code> <code class="n">X_train</code><code class="p">[</code><code class="n">representative_digit_idx</code><code class="p">]</code></pre>
+<p><a data-type="xref" href="#representative_images_plot">Figure 9-13</a> shows the 50 representative images.</p>
+<figure class="width-75"><div class="figure" id="representative_images_plot">
+<img alt="mls3 0913" height="153" src="../Images/mls3_0913.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-13. </span>Fifty representative digit images (one per cluster)</h6>
+</div>
+</figure>
+<p>Let’s look at each image and manually label them:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">y_representative_digits</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">array</code><code class="p">([</code><code class="mi">1</code><code class="p">,</code> <code class="mi">3</code><code class="p">,</code> <code class="mi">6</code><code class="p">,</code> <code class="mi">0</code><code class="p">,</code> <code class="mi">7</code><code class="p">,</code> <code class="mi">9</code><code class="p">,</code> <code class="mi">2</code><code class="p">,</code> <code class="o">...</code><code class="p">,</code> <code class="mi">5</code><code class="p">,</code> <code class="mi">1</code><code class="p">,</code> <code class="mi">9</code><code class="p">,</code> <code class="mi">9</code><code class="p">,</code> <code class="mi">3</code><code class="p">,</code> <code class="mi">7</code><code class="p">])</code></pre>
+<p>Now we have a dataset with just 50 labeled instances, but instead of being random instances, each of them is a representative image of its cluster. Let’s see if the performance is any better:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">log_reg</code> <code class="o">=</code> <code class="n">LogisticRegression</code><code class="p">(</code><code class="n">max_iter</code><code class="o">=</code><code class="mi">10_000</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">log_reg</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_representative_digits</code><code class="p">,</code> <code class="n">y_representative_digits</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">log_reg</code><code class="o">.</code><code class="n">score</code><code class="p">(</code><code class="n">X_test</code><code class="p">,</code> <code class="n">y_test</code><code class="p">)</code>
+<code class="go">0.8488664987405542</code></pre>
+<p>Wow! We jumped from 74.8% accuracy to 84.9%, although we are still only training the model on 50 instances. Since it is often costly and painful to label instances, especially when it has to be done manually by experts, it is a good idea to label representative instances rather than just random instances.</p>
+<p class="pagebreak-before">But perhaps we can go one step further: what if we propagated the labels to all the other instances in the same cluster? <a data-primary="label propagation" data-type="indexterm" id="ix_label_prop"></a>This is called <em>label propagation</em>:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">y_train_propagated</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">empty</code><code class="p">(</code><code class="nb">len</code><code class="p">(</code><code class="n">X_train</code><code class="p">),</code> <code class="n">dtype</code><code class="o">=</code><code class="n">np</code><code class="o">.</code><code class="n">int64</code><code class="p">)</code>
+<code class="k">for</code> <code class="n">i</code> <code class="ow">in</code> <code class="nb">range</code><code class="p">(</code><code class="n">k</code><code class="p">):</code>
+    <code class="n">y_train_propagated</code><code class="p">[</code><code class="n">kmeans</code><code class="o">.</code><code class="n">labels_</code> <code class="o">==</code> <code class="n">i</code><code class="p">]</code> <code class="o">=</code> <code class="n">y_representative_digits</code><code class="p">[</code><code class="n">i</code><code class="p">]</code></pre>
+<p>Now let’s train the model again and look at its performance:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">log_reg</code> <code class="o">=</code> <code class="n">LogisticRegression</code><code class="p">()</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">log_reg</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_train</code><code class="p">,</code> <code class="n">y_train_propagated</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">log_reg</code><code class="o">.</code><code class="n">score</code><code class="p">(</code><code class="n">X_test</code><code class="p">,</code> <code class="n">y_test</code><code class="p">)</code>
+<code class="go">0.8942065491183879</code></pre>
+<p>We got another significant accuracy boost! Let’s see if we can do even better by ignoring the 1% of instances that are farthest from their cluster center: this should eliminate some outliers. The following code first computes the distance from each instance to its closest cluster center, then for each cluster it sets the 1% largest distances to –1. Lastly, it creates a set without these instances marked with a –1 distance:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">percentile_closest</code> <code class="o">=</code> <code class="mi">99</code>
+
+<code class="n">X_cluster_dist</code> <code class="o">=</code> <code class="n">X_digits_dist</code><code class="p">[</code><code class="n">np</code><code class="o">.</code><code class="n">arange</code><code class="p">(</code><code class="nb">len</code><code class="p">(</code><code class="n">X_train</code><code class="p">)),</code> <code class="n">kmeans</code><code class="o">.</code><code class="n">labels_</code><code class="p">]</code>
+<code class="k">for</code> <code class="n">i</code> <code class="ow">in</code> <code class="nb">range</code><code class="p">(</code><code class="n">k</code><code class="p">):</code>
+    <code class="n">in_cluster</code> <code class="o">=</code> <code class="p">(</code><code class="n">kmeans</code><code class="o">.</code><code class="n">labels_</code> <code class="o">==</code> <code class="n">i</code><code class="p">)</code>
+    <code class="n">cluster_dist</code> <code class="o">=</code> <code class="n">X_cluster_dist</code><code class="p">[</code><code class="n">in_cluster</code><code class="p">]</code>
+    <code class="n">cutoff_distance</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">percentile</code><code class="p">(</code><code class="n">cluster_dist</code><code class="p">,</code> <code class="n">percentile_closest</code><code class="p">)</code>
+    <code class="n">above_cutoff</code> <code class="o">=</code> <code class="p">(</code><code class="n">X_cluster_dist</code> <code class="o">&gt;</code> <code class="n">cutoff_distance</code><code class="p">)</code>
+    <code class="n">X_cluster_dist</code><code class="p">[</code><code class="n">in_cluster</code> <code class="o">&amp;</code> <code class="n">above_cutoff</code><code class="p">]</code> <code class="o">=</code> <code class="o">-</code><code class="mi">1</code>
+
+<code class="n">partially_propagated</code> <code class="o">=</code> <code class="p">(</code><code class="n">X_cluster_dist</code> <code class="o">!=</code> <code class="o">-</code><code class="mi">1</code><code class="p">)</code>
+<code class="n">X_train_partially_propagated</code> <code class="o">=</code> <code class="n">X_train</code><code class="p">[</code><code class="n">partially_propagated</code><code class="p">]</code>
+<code class="n">y_train_partially_propagated</code> <code class="o">=</code> <code class="n">y_train_propagated</code><code class="p">[</code><code class="n">partially_propagated</code><code class="p">]</code></pre>
+<p>Now let’s train the model again on this partially propagated dataset and see what accuracy we get:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">log_reg</code> <code class="o">=</code> <code class="n">LogisticRegression</code><code class="p">(</code><code class="n">max_iter</code><code class="o">=</code><code class="mi">10_000</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">log_reg</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X_train_partially_propagated</code><code class="p">,</code> <code class="n">y_train_partially_propagated</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">log_reg</code><code class="o">.</code><code class="n">score</code><code class="p">(</code><code class="n">X_test</code><code class="p">,</code> <code class="n">y_test</code><code class="p">)</code>
+<code class="go">0.9093198992443325</code></pre>
+<p>Nice! With just 50 labeled instances (only 5 examples per class on average!) we got 90.9% accuracy, which is actually slightly higher than the performance we got on the fully labeled digits dataset (90.7%). This is partly thanks to the fact that we dropped some outliers, and partly because the propagated labels are actually pretty good—their accuracy is about 97.5%, as the following code shows:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="p">(</code><code class="n">y_train_partially_propagated</code> <code class="o">==</code> <code class="n">y_train</code><code class="p">[</code><code class="n">partially_propagated</code><code class="p">])</code><code class="o">.</code><code class="n">mean</code><code class="p">()</code>
+<code class="go">0.9755555555555555</code></pre>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>Scikit-Learn also offers two classes that can propagate labels automatically: <code>LabelSpreading</code> and <code>LabelPropagation</code> in the <code>sklearn.semi_supervised</code> package. Both classes construct a similarity matrix between all the instances, and iteratively propagate labels from labeled instances to similar unlabeled instances. <a data-primary="Scikit-Learn" data-secondary="sklearn.semi_supervised.LabelPropagation" data-type="indexterm" id="idm45983145041440"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.semi_supervised.LabelSpreading" data-type="indexterm" id="idm45983145040496"></a><a data-primary="Scikit-Learn" data-secondary="sklearn.semi_supervised.SelfTrainingClassifier" data-type="indexterm" id="idm45983145039584"></a>There’s also a very different class called <code>SelfTrainingClassifier</code> in the same package: you give it a base classifier (such as a <code>RandomForestClassifier</code>) and it trains it on the labeled instances, then uses it to predict labels for the unlabeled samples. It then updates the training set with the labels it is most confident about, and repeats this process of training and labeling until it cannot add labels anymore. These techniques are not magic bullets, but they can occasionally give your model a little boost.<a data-primary="" data-startref="ix_semisup_learn" data-type="indexterm" id="idm45983145037744"></a><a data-primary="" data-startref="ix_cluster_alg_semisup" data-type="indexterm" id="idm45983145036768"></a><a data-primary="" data-startref="ix_label_prop" data-type="indexterm" id="idm45983144986944"></a></p>
+</div>
+<aside data-type="sidebar" epub:type="sidebar"><div class="sidebar" id="activelearning_sb">
+<h5 class="sigil_not_in_toc">Active Learning</h5>
+<p>To continue improving your model and your training set, the next step could be to do a few rounds of <em>active learning</em>, which is when a human expert interacts with the learning algorithm, providing labels for specific instances when the algorithm requests them. <a data-primary="active learning" data-type="indexterm" id="idm45983144983600"></a><a data-primary="uncertainty sampling" data-type="indexterm" id="idm45983144982896"></a>There are many different strategies for active learning, but one of the most common ones is called <em>uncertainty sampling</em>. Here is how it works:</p>
+<ol>
+<li>
+<p>The model is trained on the labeled instances gathered so far, and this model is used to make predictions on all the unlabeled instances.</p>
+</li>
+<li>
+<p>The instances for which the model is most uncertain (i.e., where its estimated probability is lowest) are given to the expert for labeling.</p>
+</li>
+<li>
+<p>You iterate this process until the performance improvement stops being worth the labeling effort.</p>
+</li>
+</ol>
+<p>Other active learning strategies include labeling the instances that would result in the largest model change or the largest drop in the model’s validation error, or the instances that different models disagree on (e.g., an SVM and a random forest).</p>
+</div>
+</aside>
+<p>Before we move on to Gaussian mixture models, let’s take a look at DBSCAN, another popular clustering algorithm that illustrates a very different approach based on local density estimation. This approach allows the algorithm to identify clusters of arbitrary shapes.</p>
+</div>
+</section>
+<section class="less_space pagebreak-before" data-pdf-bookmark="DBSCAN" data-type="sect2"><div class="sect2" id="idm45983113078880">
+<h2 id="sigil_toc_id_162" class="sigil_not_in_toc">DBSCAN</h2>
+<p>The <em>density-based spatial clustering of applications with noise</em> (DBSCAN) algorithm defines clusters as continuous regions of high density. Here is how it works:<a data-primary="density estimation" data-type="indexterm" id="ix_density_est"></a><a data-primary="clustering algorithms" data-secondary="DBSCAN" data-type="indexterm" id="ix_cluster_alg_dbscan"></a><a data-primary="DBSCAN" data-type="indexterm" id="ix_dbscan_cluster_alg"></a></p>
+<ul>
+<li>
+<p>For each instance, the algorithm counts how many instances are located within a small distance ε (epsilon) from it. <a data-primary="core instance" data-type="indexterm" id="idm45983144970304"></a><a data-primary="ε neighborhood" data-type="indexterm" id="idm45983144969600"></a>This region is called the instance’s 
+<span class="keep-together"><em>ε-neighborhood</em>.</span></p>
+</li>
+<li>
+<p>If an instance has at least <code>min_samples</code> instances in its ε-neighborhood (including itself), then it is considered a <em>core instance</em>. In other words, core instances are those that are located in dense regions.</p>
+</li>
+<li>
+<p>All instances in the neighborhood of a core instance belong to the same cluster. This neighborhood may include other core instances; therefore, a long sequence of neighboring core instances forms a single cluster.</p>
+</li>
+<li>
+<p>Any instance that is not a core instance and does not have one in its neighborhood is considered an anomaly.</p>
+</li>
+</ul>
+<p>This algorithm works well if all the clusters are well separated by low-density regions. <a data-primary="Scikit-Learn" data-secondary="sklearn.cluster.DBSCAN" data-type="indexterm" id="idm45983144963648"></a>The <code>DBSCAN</code> class in Scikit-Learn is as simple to use as you might expect. Let’s test it on the moons dataset, introduced in <a data-type="xref" href="HOMLWSKT009.xhtml#svm_chapter">Chapter 5</a>:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.cluster</code> <code class="kn">import</code> <code class="n">DBSCAN</code>
+<code class="kn">from</code> <code class="nn">sklearn.datasets</code> <code class="kn">import</code> <code class="n">make_moons</code>
+
+<code class="n">X</code><code class="p">,</code> <code class="n">y</code> <code class="o">=</code> <code class="n">make_moons</code><code class="p">(</code><code class="n">n_samples</code><code class="o">=</code><code class="mi">1000</code><code class="p">,</code> <code class="n">noise</code><code class="o">=</code><code class="mf">0.05</code><code class="p">)</code>
+<code class="n">dbscan</code> <code class="o">=</code> <code class="n">DBSCAN</code><code class="p">(</code><code class="n">eps</code><code class="o">=</code><code class="mf">0.05</code><code class="p">,</code> <code class="n">min_samples</code><code class="o">=</code><code class="mi">5</code><code class="p">)</code>
+<code class="n">dbscan</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">)</code></pre>
+<p>The labels of all the instances are now available in the <code>labels_</code> instance variable:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">dbscan</code><code class="o">.</code><code class="n">labels_</code>
+<code class="go">array([ 0,  2, -1, -1,  1,  0,  0,  0,  2,  5, [...], 3,  3,  4,  2,  6,  3])</code></pre>
+<p>Notice that some instances have a cluster index equal to –1, which means that they are considered as anomalies by the algorithm. The indices of the core instances are available in the <code>core_sample_indices_</code> instance variable, and the core instances themselves are available in the <code>components_</code> instance variable:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">dbscan</code><code class="o">.</code><code class="n">core_sample_indices_</code>
+<code class="go">array([  0,   4,   5,   6,   7,   8,  10,  11, [...], 993, 995, 997, 998, 999])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">dbscan</code><code class="o">.</code><code class="n">components_</code>
+<code class="go">array([[-0.02137124,  0.40618608],</code>
+<code class="go">       [-0.84192557,  0.53058695],</code>
+<code class="go">       [...],</code>
+<code class="go">       [ 0.79419406,  0.60777171]])</code></pre>
+<p class="pagebreak-before">This clustering is represented in the lefthand plot of <a data-type="xref" href="#dbscan_plot">Figure 9-14</a>. As you can see, it identified quite a lot of anomalies, plus seven different clusters. How disappointing! Fortunately, if we widen each instance’s neighborhood by increasing <code>eps</code> to 0.2, we get the clustering on the right, which looks perfect. Let’s continue with this model.</p>
+<figure><div class="figure" id="dbscan_plot">
+<img alt="mls3 0914" height="200" src="../Images/mls3_0914.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-14. </span>DBSCAN clustering using two different neighborhood radiuses</h6>
+</div>
+</figure>
+<p>Surprisingly, the <code>DBSCAN</code> class does not have a <code>predict()</code> method, although it has a <code>fit_predict()</code> method. In other words, it cannot predict which cluster a new instance belongs to. This decision was made because different classification algorithms can be better for different tasks, so the authors decided to let the user choose which one to use. Moreover, it’s not hard to implement. For example, let’s train a <code>KNeighborsClassifier</code>:<a data-primary="Scikit-Learn" data-secondary="sklearn.neighbors.KNeighborsClassifier" data-type="indexterm" id="idm45983144830784"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.neighbors</code> <code class="kn">import</code> <code class="n">KNeighborsClassifier</code>
+
+<code class="n">knn</code> <code class="o">=</code> <code class="n">KNeighborsClassifier</code><code class="p">(</code><code class="n">n_neighbors</code><code class="o">=</code><code class="mi">50</code><code class="p">)</code>
+<code class="n">knn</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">dbscan</code><code class="o">.</code><code class="n">components_</code><code class="p">,</code> <code class="n">dbscan</code><code class="o">.</code><code class="n">labels_</code><code class="p">[</code><code class="n">dbscan</code><code class="o">.</code><code class="n">core_sample_indices_</code><code class="p">])</code></pre>
+<p>Now, given a few new instances, we can predict which clusters they most likely belong to and even estimate a probability for each cluster:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">X_new</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">array</code><code class="p">([[</code><code class="o">-</code><code class="mf">0.5</code><code class="p">,</code> <code class="mi">0</code><code class="p">],</code> <code class="p">[</code><code class="mi">0</code><code class="p">,</code> <code class="mf">0.5</code><code class="p">],</code> <code class="p">[</code><code class="mi">1</code><code class="p">,</code> <code class="o">-</code><code class="mf">0.1</code><code class="p">],</code> <code class="p">[</code><code class="mi">2</code><code class="p">,</code> <code class="mi">1</code><code class="p">]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">knn</code><code class="o">.</code><code class="n">predict</code><code class="p">(</code><code class="n">X_new</code><code class="p">)</code>
+<code class="go">array([1, 0, 1, 0])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">knn</code><code class="o">.</code><code class="n">predict_proba</code><code class="p">(</code><code class="n">X_new</code><code class="p">)</code>
+<code class="go">array([[0.18, 0.82],</code>
+<code class="go">       [1.  , 0.  ],</code>
+<code class="go">       [0.12, 0.88],</code>
+<code class="go">       [1.  , 0.  ]])</code></pre>
+<p>Note that we only trained the classifier on the core instances, but we could also have chosen to train it on all the instances, or all but the anomalies: this choice depends on the final task.</p>
+<p class="pagebreak-before">The decision boundary is represented in <a data-type="xref" href="#cluster_classification_plot">Figure 9-15</a> (the crosses represent the four instances in <code>X_new</code>). Notice that since there is no anomaly in the training set, the classifier always chooses a cluster, even when that cluster is far away. It is fairly straightforward to introduce a maximum distance, in which case the two instances that are far away from both clusters are classified as anomalies. To do this, use the <code>kneighbors()</code> method of the <code>KNeighborsClassifier</code>. Given a set of instances, it returns the distances and the indices of the <em>k</em>-nearest neighbors in the training set (two matrices, each with <em>k</em> columns):</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">y_dist</code><code class="p">,</code> <code class="n">y_pred_idx</code> <code class="o">=</code> <code class="n">knn</code><code class="o">.</code><code class="n">kneighbors</code><code class="p">(</code><code class="n">X_new</code><code class="p">,</code> <code class="n">n_neighbors</code><code class="o">=</code><code class="mi">1</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">y_pred</code> <code class="o">=</code> <code class="n">dbscan</code><code class="o">.</code><code class="n">labels_</code><code class="p">[</code><code class="n">dbscan</code><code class="o">.</code><code class="n">core_sample_indices_</code><code class="p">][</code><code class="n">y_pred_idx</code><code class="p">]</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">y_pred</code><code class="p">[</code><code class="n">y_dist</code> <code class="o">&gt;</code> <code class="mf">0.2</code><code class="p">]</code> <code class="o">=</code> <code class="o">-</code><code class="mi">1</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">y_pred</code><code class="o">.</code><code class="n">ravel</code><code class="p">()</code>
+<code class="go">array([-1,  0,  1, -1])</code></pre>
+<figure class="smallerseventy"><div class="figure" id="cluster_classification_plot">
+<img alt="mls3 0915" height="277" src="../Images/mls3_0915.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-15. </span>Decision boundary between two clusters</h6>
+</div>
+</figure>
+<p>In short, DBSCAN is a very simple yet powerful algorithm capable of identifying any number of clusters of any shape. It is robust to outliers, and it has just two hyperparameters (<code>eps</code> and <code>min_samples</code>). If the density varies significantly across the clusters, however, or if there’s no sufficiently low-density region around some clusters, DBSCAN can struggle to capture all the clusters properly.<a data-primary="computational complexity" data-secondary="DBSCAN" data-type="indexterm" id="idm45983144636736"></a> Moreover, its computational complexity is roughly <em>O</em>(<em>m</em><sup>2</sup><em>n</em>), so it does not scale well to large 
+<span class="keep-together">datasets.</span></p>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>You may also want to try <em>hierarchical DBSCAN</em> (HDBSCAN), <a data-primary="HDBSCAN (hierarchical DBSCAN)" data-type="indexterm" id="idm45983144632176"></a><a data-primary="hierarchical DBSCAN (HDBSCAN)" data-type="indexterm" id="idm45983144631472"></a>which is implemented in the <a href="https://github.com/scikit-learn-contrib/hdbscan"><code>scikit-learn-contrib</code> project</a>, as it is usually better than DBSCAN at finding clusters of varying densities.<a data-primary="" data-startref="ix_cluster_alg_dbscan" data-type="indexterm" id="idm45983144629792"></a><a data-primary="" data-startref="ix_dbscan_cluster_alg" data-type="indexterm" id="idm45983144628816"></a><a data-primary="" data-startref="ix_density_est" data-type="indexterm" id="idm45983144589856"></a></p>
+</div>
+</div>
+</section>
+<section class="less_space pagebreak-before" data-pdf-bookmark="Other Clustering Algorithms" data-type="sect2"><div class="sect2" id="idm45983144976224">
+<h2 id="sigil_toc_id_163" class="sigil_not_in_toc">Other Clustering Algorithms</h2>
+<p>Scikit-Learn implements several more clustering algorithms that you should take a look at. I cannot cover them all in detail here, but here is a brief overview:</p>
+<dl>
+<dt>Agglomerative clustering</dt>
+<dd>
+<p>A hierarchy of clusters is built from the bottom up. Think of many tiny bubbles floating on water and gradually attaching to each other until there’s one big group of bubbles. <a data-primary="clustering algorithms" data-secondary="agglomerative clustering" data-type="indexterm" id="idm45983144584944"></a><a data-primary="agglomerative clustering" data-type="indexterm" id="idm45983144583952"></a>Similarly, at each iteration, agglomerative clustering connects the nearest pair of clusters (starting with individual instances). <a data-primary="binary trees" data-type="indexterm" id="idm45983144583136"></a>If you drew a tree with a branch for every pair of clusters that merged, you would get a binary tree of clusters, where the leaves are the individual instances. This approach can capture clusters of various shapes; it also produces a flexible and informative cluster tree instead of forcing you to choose a particular cluster scale, and it can be used with any pairwise distance. It can scale nicely to large numbers of instances if you provide a connectivity matrix, which is a sparse <em>m</em> × <em>m</em> matrix that indicates which pairs of instances are neighbors (e.g., returned by <code>sklearn.neighbors.kneighbors_graph()</code>). Without a connectivity matrix, the algorithm does not scale well to large datasets.</p>
+</dd>
+<dt>BIRCH</dt>
+<dd>
+<p>The balanced iterative reducing and clustering using hierarchies (BIRCH) algorithm was designed specifically for very large datasets, and it can be faster than batch <em>k</em>-means, with similar results, as long as the number of features is not too large (&lt;20). <a data-primary="clustering algorithms" data-secondary="BIRCH" data-type="indexterm" id="idm45983144579408"></a><a data-primary="balanced iterative reducing and clustering using hierarchies (BIRCH)" data-type="indexterm" id="idm45983144578432"></a><a data-primary="BIRCH (balanced iterative reducing and clustering using hierarchies)" data-type="indexterm" id="idm45983144577792"></a>During training, it builds a tree structure containing just enough information to quickly assign each new instance to a cluster, without having to store all the instances in the tree: this approach allows it to use limited memory while handling huge datasets.</p>
+</dd>
+<dt>Mean-shift</dt>
+<dd>
+<p>This algorithm<a data-primary="clustering algorithms" data-secondary="mean-shift" data-type="indexterm" id="idm45983144575392"></a><a data-primary="mean-shift, clustering algorithms" data-type="indexterm" id="idm45983144574384"></a> starts by placing a circle centered on each instance; then for each circle it computes the mean of all the instances located within it, and it shifts the circle so that it is centered on the mean. Next, it iterates this mean-shifting step until all the circles stop moving (i.e., until each of them is centered on the mean of the instances it contains). Mean-shift shifts the circles in the direction of higher density, until each of them has found a local density maximum. Finally, all the instances whose circles have settled in the same place (or close enough) are assigned to the same cluster. Mean-shift has some of the same features as DBSCAN, like how it can find any number of clusters of any shape, it has very few hyperparameters (just one—the radius of the circles, called the <em>bandwidth</em>), and it relies on local density estimation. But unlike DBSCAN, mean-shift tends to chop clusters into pieces when they have internal density variations. Unfortunately, its computational complexity is <em>O</em>(<em>m</em><sup>2</sup><em>n</em>), so it is not suited for large datasets.</p>
+</dd>
+<dt>Affinity propagation</dt>
+<dd>
+<p>In this algorithm, instances repeatedly exchange messages between one another until every instance has elected another instance (or itself) to represent it. <a data-primary="clustering algorithms" data-secondary="affinity propagation" data-type="indexterm" id="idm45983144570336"></a><a data-primary="affinity propagation" data-type="indexterm" id="idm45983144569360"></a><a data-primary="exemplars, affinity propagation" data-type="indexterm" id="idm45983144568688"></a>These elected instances are called <em>exemplars</em>. Each exemplar and all the instances that elected it form one cluster. In real-life politics, you typically want to vote for a candidate whose opinions are similar to yours, but you also want them to win the election, so you might choose a candidate you don’t fully agree with, but who is more popular. You typically evaluate popularity through polls. Affinity propagation works in a similar way, and it tends to choose exemplars located near the center of clusters, similar to <em>k</em>-means. But unlike with <em>k</em>-means, you don’t have to pick a number of clusters ahead of time: it is determined during training. Moreover, affinity propagation can deal nicely with clusters of different sizes. Sadly, this algorithm has a computational complexity of <em>O</em>(<em>m</em><sup>2</sup>), so it is not suited for large datasets.</p>
+</dd>
+<dt>Spectral clustering</dt>
+<dd>
+<p>This algorithm<a data-primary="clustering algorithms" data-secondary="spectral clustering" data-type="indexterm" id="idm45983144564240"></a><a data-primary="spectral clustering" data-type="indexterm" id="idm45983144563232"></a> takes a similarity matrix between the instances and creates a low-dimensional embedding from it (i.e., it reduces the matrix’s dimensionality), then it uses another clustering algorithm in this low-dimensional space (Scikit-Learn’s implementation uses <em>k</em>-means). Spectral clustering can capture complex cluster structures, and it can also be used to cut graphs (e.g., to identify clusters of friends on a social network). It does not scale well to large numbers of instances, and it does not behave well when the clusters have very different sizes.<a data-primary="" data-startref="ix_cluster_alg_ch9" data-type="indexterm" id="idm45983144562048"></a></p>
+</dd>
+</dl>
+<p>Now let’s dive into Gaussian mixture models, which can be used for density estimation, clustering, and anomaly detection.</p>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Gaussian Mixtures" data-type="sect1"><div class="sect1" id="idm45983113925872">
+<h2 id="sigil_toc_id_164">Gaussian Mixtures</h2>
+<p>A <em>Gaussian mixture model</em> (GMM) is a probabilistic model that assumes that the instances were generated from a mixture of several Gaussian distributions whose parameters are unknown. <a data-primary="unsupervised learning" data-secondary="GMM" data-type="indexterm" id="ix_unsup_learn_gmm"></a><a data-primary="clustering algorithms" data-secondary="GMM" data-type="indexterm" id="ix_cluster_alg_gmm"></a><a data-primary="Gaussian mixture model (GMM)" data-type="indexterm" id="ix_gaussian_gmm"></a>All the instances generated from a single Gaussian distribution form a cluster that typically looks like an ellipsoid. Each cluster can have a different ellipsoidal shape, size, density, and orientation, just like in <a data-type="xref" href="#bad_kmeans_plot">Figure 9-11</a>. When you observe an instance, you know it was generated from one of the Gaussian distributions, but you are not told which one, and you do not know what the parameters of these distributions are.</p>
+<p>There are several GMM variants. In the simplest variant, implemented in the 
+<span class="keep-together"><code>GaussianMixture</code></span> class, you must know in advance the number <em>k</em> of Gaussian distributions. <a data-primary="Scikit-Learn" data-secondary="sklearn.mixture.GaussianMixture" data-type="indexterm" id="idm45983144552304"></a>The dataset <strong>X</strong> is assumed to have been generated through the following probabilistic process:</p>
+<ul>
+<li>
+<p>For each instance, a cluster is picked randomly from among <em>k</em> clusters. The probability of choosing the <em>j</em><sup>th</sup> cluster is the cluster’s weight <em>ϕ</em><sup>(<em>j</em>)</sup>.⁠<sup><a data-type="noteref" href="#idm45983144546944" id="idm45983144546944-marker">6</a></sup> The index of the cluster chosen for the <em>i</em><sup>th</sup> instance is noted <em>z</em><sup>(<em>i</em>)</sup>.</p>
+</li>
+<li>
+<p>If the <em>i</em><sup>th</sup> instance was assigned to the <em>j</em><sup>th</sup> cluster (i.e., <em>z</em><sup>(<em>i</em>)</sup> = <em>j</em>), then the location <strong>x</strong><sup>(<em>i</em>)</sup> of this instance is sampled randomly from the Gaussian distribution with mean <strong>μ</strong><sup>(<em>j</em>)</sup> and covariance matrix <strong>Σ</strong><sup>(<em>j</em>)</sup>. This is noted <strong>x</strong><sup>(<em>i</em>)</sup> ~ 𝒩(<strong>μ</strong><sup>(<em>j</em>)</sup>, <strong>Σ</strong><sup>(<em>j</em>)</sup>).</p>
+</li>
+</ul>
+<p>So what can you do with such a model? Well, given the dataset <strong>X</strong>, you typically want to start by estimating the weights <strong>ϕ</strong> and all the distribution parameters <strong>μ</strong><sup>(1)</sup> to <strong>μ</strong><sup>(<em>k</em>)</sup> and <strong>Σ</strong><sup>(1)</sup> to <strong>Σ</strong><sup>(<em>k</em>)</sup>. Scikit-Learn’s <code>GaussianMixture</code> class makes this super easy:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">sklearn.mixture</code> <code class="kn">import</code> <code class="n">GaussianMixture</code>
+
+<code class="n">gm</code> <code class="o">=</code> <code class="n">GaussianMixture</code><code class="p">(</code><code class="n">n_components</code><code class="o">=</code><code class="mi">3</code><code class="p">,</code> <code class="n">n_init</code><code class="o">=</code><code class="mi">10</code><code class="p">)</code>
+<code class="n">gm</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">)</code></pre>
+<p>Let’s look at the parameters that the algorithm estimated:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">gm</code><code class="o">.</code><code class="n">weights_</code>
+<code class="go">array([0.39025715, 0.40007391, 0.20966893])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">gm</code><code class="o">.</code><code class="n">means_</code>
+<code class="go">array([[ 0.05131611,  0.07521837],</code>
+<code class="go">       [-1.40763156,  1.42708225],</code>
+<code class="go">       [ 3.39893794,  1.05928897]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">gm</code><code class="o">.</code><code class="n">covariances_</code>
+<code class="go">array([[[ 0.68799922,  0.79606357],</code>
+<code class="go">        [ 0.79606357,  1.21236106]],</code>
+
+<code class="go">       [[ 0.63479409,  0.72970799],</code>
+<code class="go">        [ 0.72970799,  1.1610351 ]],</code>
+
+<code class="go">       [[ 1.14833585, -0.03256179],</code>
+<code class="go">        [-0.03256179,  0.95490931]]])</code></pre>
+<p>Great, it worked fine! Indeed, two of the three clusters were generated with 500 instances each, while the third cluster only contains 250 instances. So the true cluster weights are 0.4, 0.4, and 0.2, respectively, and that’s roughly what the algorithm found. Similarly, the true means and covariance matrices are quite close to those found by the algorithm. But how? <a data-primary="EM (expectation-maximization)" data-type="indexterm" id="idm45983144453504"></a><a data-primary="expectation-maximization (EM)" data-type="indexterm" id="idm45983144452192"></a><a data-primary="maximization step, Gaussian mixtures" data-type="indexterm" id="idm45983144451536"></a>This class relies on the <em>expectation-maximization</em> (EM) algorithm, which has many similarities with the <em>k</em>-means algorithm: it also initializes the cluster parameters randomly, then it repeats two steps until convergence, first assigning instances to clusters (this is called the <em>expectation step</em>) and then updating the clusters (this is called the <em>maximization step</em>). Sounds familiar, right? In the context of clustering, you can think of EM as a generalization of <em>k</em>-means that not only finds the cluster centers (<strong>μ</strong><sup>(1)</sup> to <strong>μ</strong><sup>(<em>k</em>)</sup>), but also their size, shape, and orientation (<strong>Σ</strong><sup>(1)</sup> to <strong>Σ</strong><sup>(<em>k</em>)</sup>), as well as their relative weights (<em>ϕ</em><sup>(1)</sup> to <em>ϕ</em><sup>(<em>k</em>)</sup>). Unlike <em>k</em>-means, though, EM uses soft cluster assignments, not hard assignments. For each instance, during the expectation step, the algorithm estimates the probability that it belongs to each cluster (based on the current cluster parameters). <a data-primary="clustering algorithms" data-secondary="responsibilities of clusters for instances" data-type="indexterm" id="idm45983144442192"></a>Then, during the maximization step, each cluster is updated using <em>all</em> the instances in the dataset, with each instance weighted by the estimated probability that it belongs to that cluster. These probabilities are called the <em>responsibilities</em> of the clusters for the instances. <span class="keep-together">During</span> the maximization step, each cluster’s update will mostly be impacted by the instances it is most responsible for.</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>Unfortunately, just like <em>k</em>-means, EM can end up converging to poor solutions, so it needs to be run several times, keeping only the best solution. This is why we set <code>n_init</code> to 10. Be careful: by default <code>n_init</code> is set to 1.</p>
+</div>
+<p>You can check whether or not the algorithm converged and how many iterations it took:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">gm</code><code class="o">.</code><code class="n">converged_</code>
+<code class="go">True</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">gm</code><code class="o">.</code><code class="n">n_iter_</code>
+<code class="go">4</code></pre>
+<p>Now that you have an estimate of the location, size, shape, orientation, and relative weight of each cluster, the model can easily assign each instance to the most likely cluster (hard clustering) or estimate the probability that it belongs to a particular cluster (soft clustering). Just use the <code>predict()</code> method for hard clustering, or the <code>predict_proba()</code> method for soft clustering:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">gm</code><code class="o">.</code><code class="n">predict</code><code class="p">(</code><code class="n">X</code><code class="p">)</code>
+<code class="go">array([0, 0, 1, ..., 2, 2, 2])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">gm</code><code class="o">.</code><code class="n">predict_proba</code><code class="p">(</code><code class="n">X</code><code class="p">)</code><code class="o">.</code><code class="n">round</code><code class="p">(</code><code class="mi">3</code><code class="p">)</code>
+<code class="go">array([[0.977, 0.   , 0.023],</code>
+<code class="go">       [0.983, 0.001, 0.016],</code>
+<code class="go">       [0.   , 1.   , 0.   ],</code>
+<code class="go">       ...,</code>
+<code class="go">       [0.   , 0.   , 1.   ],</code>
+<code class="go">       [0.   , 0.   , 1.   ],</code>
+<code class="go">       [0.   , 0.   , 1.   ]])</code></pre>
+<p>A Gaussian mixture model is a <em>generative model</em>, meaning you can sample new instances from it (note that they are ordered by cluster index):</p>
+<pre class="less_space pagebreak-before" data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">X_new</code><code class="p">,</code> <code class="n">y_new</code> <code class="o">=</code> <code class="n">gm</code><code class="o">.</code><code class="n">sample</code><code class="p">(</code><code class="mi">6</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">X_new</code>
+<code class="go">array([[-0.86944074, -0.32767626],</code>
+<code class="go">       [ 0.29836051,  0.28297011],</code>
+<code class="go">       [-2.8014927 , -0.09047309],</code>
+<code class="go">       [ 3.98203732,  1.49951491],</code>
+<code class="go">       [ 3.81677148,  0.53095244],</code>
+<code class="go">       [ 2.84104923, -0.73858639]])</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">y_new</code>
+<code class="go">array([0, 0, 1, 2, 2, 2])</code></pre>
+<p>It is also possible to estimate the density of the model at any given location. <a data-primary="density estimation" data-type="indexterm" id="idm45983144292032"></a>This is achieved using the <code>score_samples()</code> method: for each instance it is given, this method estimates the log of the <em>probability density function</em> (PDF) at that location. The greater the score, the higher the density:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">gm</code><code class="o">.</code><code class="n">score_samples</code><code class="p">(</code><code class="n">X</code><code class="p">)</code><code class="o">.</code><code class="n">round</code><code class="p">(</code><code class="mi">2</code><code class="p">)</code>
+<code class="go">array([-2.61, -3.57, -3.33, ..., -3.51, -4.4 , -3.81])</code></pre>
+<p>If you compute the exponential of these scores, you get the value of the PDF at the location of the given instances. These are not probabilities, but probability <em>densities</em>: they can take on any positive value, not just a value between 0 and 1. To estimate the probability that an instance will fall within a particular region, you would have to integrate the PDF over that region (if you do so over the entire space of possible instance locations, the result will be 1).</p>
+<p><a data-type="xref" href="#gaussian_mixtures_plot">Figure 9-16</a> shows the cluster means, the decision boundaries (dashed lines), and the density contours of this model.</p>
+<figure><div class="figure" id="gaussian_mixtures_plot">
+<img alt="mls3 0916" height="284" src="../Images/mls3_0916.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-16. </span>Cluster means, decision boundaries, and density contours of a trained Gaussian mixture model</h6>
+</div>
+</figure>
+<p>Nice! The algorithm clearly found an excellent solution. Of course, we made its task easy by generating the data using a set of 2D Gaussian distributions (unfortunately, real-life data is not always so Gaussian and low-dimensional). We also gave the algorithm the correct number of clusters. When there are many dimensions, or many clusters, or few instances, EM can struggle to converge to the optimal solution. You might need to reduce the difficulty of the task by limiting the number of parameters that the algorithm has to learn. One way to do this is to limit the range of shapes and orientations that the clusters can have. This can be achieved by imposing constraints on the covariance matrices. To do this, set the <code>covariance_type</code> hyperparameter to one of the following values:</p>
+<dl>
+<dt><code>"spherical"</code></dt>
+<dd>
+<p>All clusters must be spherical, but they can have different diameters (i.e., different variances).</p>
+</dd>
+<dt><code>"diag"</code></dt>
+<dd>
+<p>Clusters can take on any ellipsoidal shape of any size, but the ellipsoid’s axes must be parallel to the coordinate axes (i.e., the covariance matrices must be diagonal).</p>
+</dd>
+<dt><code>"tied"</code></dt>
+<dd>
+<p>All clusters must have the same ellipsoidal shape, size, and orientation (i.e., all clusters share the same covariance matrix).</p>
+</dd>
+</dl>
+<p>By default, <code>covariance_type</code> is equal to <code>"full"</code>, which means that each cluster can take on any shape, size, and orientation (it has its own unconstrained covariance matrix). <a data-type="xref" href="#covariance_type_plot">Figure 9-17</a> plots the solutions found by the EM algorithm when <code>covariance_type</code> is set to <code>"tied"</code> or <code>"spherical"</code>.</p>
+<figure><div class="figure" id="covariance_type_plot">
+<img alt="mls3 0917" height="253" src="../Images/mls3_0917.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-17. </span>Gaussian mixtures for tied clusters (left) and spherical clusters (right)</h6>
+</div>
+</figure>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>The computational complexity of training a <code>GaussianMixture</code> model depends on the number of instances <em>m</em>, the number of dimensions <em>n</em>, the number of clusters <em>k</em>, and the constraints on the covariance matrices. <a data-primary="computational complexity" data-secondary="Gaussian mixture model" data-type="indexterm" id="idm45983144223280"></a>If <code>covariance_type</code> is <code>"spherical"</code> or <code>"diag"</code>, it is <em>O</em>(<em>kmn</em>), assuming the data has a clustering structure. If <code>covariance_type</code> is <code>"tied"</code> or <code>"full"</code>, it is <em>O</em>(<em>kmn</em><sup>2</sup> + <em>kn</em><sup>3</sup>), so it will not scale to large numbers of features.</p>
+</div>
+<p>Gaussian mixture models can also be used for anomaly detection. We’ll see how in the next section.</p>
+<section data-pdf-bookmark="Using Gaussian Mixtures for Anomaly Detection" data-type="sect2"><div class="sect2" id="idm45983144216400">
+<h2 id="sigil_toc_id_165" class="sigil_not_in_toc">Using Gaussian Mixtures for Anomaly Detection</h2>
+<p>Using a Gaussian mixture model for anomaly detection is quite simple: any instance located in a low-density region can be considered an anomaly. <a data-primary="anomaly detection" data-secondary="GMM" data-type="indexterm" id="ix_anomaly_detect_gmm"></a><a data-primary="Gaussian mixture model (GMM)" data-secondary="anomaly detection" data-type="indexterm" id="ix_gmm_anomaly"></a><a data-primary="density threshold" data-type="indexterm" id="idm45983144212240"></a>You must define what density threshold you want to use. For example, in a manufacturing company that tries to detect defective products, the ratio of defective products is usually well known. Say it is equal to 2%. You then set the density threshold to be the value that results in having 2% of the instances located in areas below that threshold density. If you notice that you get too many false positives (i.e., perfectly good products that are flagged as defective), you can lower the threshold. Conversely, if you have too many false negatives (i.e., defective products that the system does not flag as defective), you can increase the threshold. This is the usual precision/recall trade-off (see <a data-type="xref" href="HOMLWSKT007.xhtml#classification_chapter">Chapter 3</a>). Here is how you would identify the outliers using the fourth percentile lowest density as the threshold (i.e., approximately 4% of the instances will be flagged as anomalies):</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">densities</code> <code class="o">=</code> <code class="n">gm</code><code class="o">.</code><code class="n">score_samples</code><code class="p">(</code><code class="n">X</code><code class="p">)</code>
+<code class="n">density_threshold</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">percentile</code><code class="p">(</code><code class="n">densities</code><code class="p">,</code> <code class="mi">2</code><code class="p">)</code>
+<code class="n">anomalies</code> <code class="o">=</code> <code class="n">X</code><code class="p">[</code><code class="n">densities</code> <code class="o">&lt;</code> <code class="n">density_threshold</code><code class="p">]</code></pre>
+<p><a data-type="xref" href="#mixture_anomaly_detection_plot">Figure 9-18</a> represents these anomalies as stars.</p>
+<p>A closely related task is <em>novelty detection</em>: it differs from anomaly detection in that the algorithm is assumed to be trained on a “clean” dataset, uncontaminated by outliers, whereas anomaly detection does not make this assumption. <a data-primary="novelty detection" data-type="indexterm" id="idm45983144181440"></a>Indeed, outlier detection is often used to clean up a dataset.</p>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>Gaussian mixture models try to fit all the data, including the outliers; if you have too many of them this will bias the model’s view of “normality”, and some outliers may wrongly be considered as normal. If this happens, you can try to fit the model once, use it to detect and remove the most extreme outliers, then fit the model again on the cleaned-up dataset. Another approach is to use robust covariance estimation methods (see the <code>EllipticEnvelope</code> class).</p>
+</div>
+<figure><div class="figure" id="mixture_anomaly_detection_plot">
+<img alt="mls3 0918" height="285" src="../Images/mls3_0918.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-18. </span>Anomaly detection using a Gaussian mixture model</h6>
+</div>
+</figure>
+<p>Just like <em>k</em>-means, the <code>GaussianMixture</code> algorithm requires you to specify the number of clusters. So how can you find that number?<a data-primary="" data-startref="ix_gmm_anomaly" data-type="indexterm" id="idm45983144175760"></a><a data-primary="" data-startref="ix_anomaly_detect_gmm" data-type="indexterm" id="idm45983144174784"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Selecting the Number of Clusters" data-type="sect2"><div class="sect2" id="idm45983144146688">
+<h2 id="sigil_toc_id_166" class="sigil_not_in_toc">Selecting the Number of Clusters</h2>
+<p>With <em>k</em>-means, you can use the inertia or the silhouette score to select the appropriate number of clusters. <a data-primary="Gaussian mixture model (GMM)" data-secondary="selecting number of clusters" data-type="indexterm" id="ix_gmm_select_cluster"></a>But with Gaussian mixtures, it is not possible to use these metrics because they are not reliable when the clusters are not spherical or have different sizes. <a data-primary="Akaike information criterion (AIC)" data-type="indexterm" id="idm45983144142928"></a><a data-primary="Bayesian information criterion (BIC)" data-type="indexterm" id="idm45983144142288"></a><a data-primary="BIC (Bayesian information criterion)" data-type="indexterm" id="idm45983144141600"></a><a data-primary="theoretical information criterion" data-type="indexterm" id="idm45983144140912"></a>Instead, you can try to find the model that minimizes a <em>theoretical information criterion</em>, such as the <em>Bayesian information criterion</em> (BIC) or the <em>Akaike information criterion</em> (AIC), defined in <a data-type="xref" href="#information_criteria_equation">Equation 9-1</a>.</p>
+<div data-type="equation" id="information_criteria_equation">
+<h5 class="sigil_not_in_toc"><span class="label">Equation 9-1. </span>Bayesian information criterion (BIC) and Akaike information criterion (AIC)</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd columnalign="right">
+<mrow>
+<mi>B</mi>
+<mi>I</mi>
+<mi>C</mi>
+<mo>=</mo>
+<mspace width="0.166667em"/>
+</mrow>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mspace width="0.166667em"/>
+<mo form="prefix">log</mo>
+<mrow>
+<mo>(</mo>
+<mi>m</mi>
+<mo>)</mo>
+</mrow>
+<mi>p</mi>
+<mo>-</mo>
+<mn>2</mn>
+<mo form="prefix">log</mo>
+<mrow>
+<mo>(</mo>
+<mover accent="true"><mi mathvariant="script">L</mi> <mo>^</mo></mover>
+<mo>)</mo>
+</mrow>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<mrow>
+<mi>A</mi>
+<mi>I</mi>
+<mi>C</mi>
+<mo>=</mo>
+<mspace width="0.166667em"/>
+</mrow>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mspace width="0.166667em"/>
+<mn>2</mn>
+<mi>p</mi>
+<mo>-</mo>
+<mn>2</mn>
+<mo form="prefix">log</mo>
+<mo>(</mo>
+<mover accent="true"><mi mathvariant="script">L</mi> <mo>^</mo></mover>
+<mo>)</mo>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>In these equations:</p>
+<ul>
+<li>
+<p><em>m</em> is the number of instances, as always.</p>
+</li>
+<li>
+<p><em>p</em> is the number of parameters learned by the model.</p>
+</li>
+<li>
+<p><math xmlns="http://www.w3.org/1998/Math/MathML"><mover><mi mathvariant="script">L</mi><mo>^</mo></mover></math> is the maximized value of the <em>likelihood function</em> of the model.</p>
+</li>
+</ul>
+<p class="pagebreak-before">Both the BIC and the AIC penalize models that have more parameters to learn (e.g., more clusters) and reward models that fit the data well. They often end up selecting the same model. When they differ, the model selected by the BIC tends to be simpler (fewer parameters) than the one selected by the AIC, but tends to not fit the data quite as well (this is especially true for larger datasets).</p>
+<aside data-type="sidebar" epub:type="sidebar"><div class="sidebar" id="idm45983144104112">
+<h5 class="sigil_not_in_toc">Likelihood Function</h5>
+<p>The terms “probability” and “likelihood” are often used interchangeably in everyday language, but they have very different meanings in statistics. <a data-primary="probability versus likelihood" data-type="indexterm" id="ix_prob_likely"></a><a data-primary="likelihood function" data-type="indexterm" id="ix_likelihood"></a>Given a statistical model with some parameters <strong>θ</strong>, the word “probability” is used to describe how plausible a future outcome <strong>x</strong> is (knowing the parameter values <strong>θ</strong>), while the word “likelihood” is used to describe how plausible a particular set of parameter values <strong>θ</strong> are, after the outcome <strong>x</strong> is known.</p>
+<p>Consider a 1D mixture model of two Gaussian distributions centered at –4 and +1. For simplicity, this toy model has a single parameter <em>θ</em> that controls the standard deviations of both distributions. The top-left contour plot in <a data-type="xref" href="#likelihood_function_plot">Figure 9-19</a> shows the entire model <em>f</em>(<em>x</em>; <em>θ</em>) as a function of both <em>x</em> and <em>θ</em>. To estimate the probability distribution of a future outcome <em>x</em>, you need to set the model parameter <em>θ</em>. For example, if you set <em>θ</em> to 1.3 (the horizontal line), you get the probability density function <em>f</em>(<em>x</em>; <em>θ</em>=1.3) shown in the lower-left plot. Say you want to estimate the probability that <em>x</em> will fall between –2 and +2. You must calculate the integral of the PDF on this range (i.e., the surface of the shaded region). But what if you don’t know <em>θ</em>, and instead if you have observed a single instance <em>x</em>=2.5 (the vertical line in the upper-left plot)? In this case, you get the likelihood function ℒ(<em>θ</em>|<em>x</em>=2.5)=f(<em>x</em>=2.5; <em>θ</em>), represented in the upper-right plot.</p>
+<figure><div class="figure" id="likelihood_function_plot">
+<img alt="mls3 0919" height="318" src="../Images/mls3_0919.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-19. </span>A model’s parametric function (top left), and some derived functions: a PDF (lower left), a likelihood function (top right), and a log likelihood function (lower right)</h6>
+</div>
+</figure>
+<p>In short, the PDF is a function of <em>x</em> (with <em>θ</em> fixed), while the likelihood function is a function of <em>θ</em> (with <em>x</em> fixed). <a data-primary="PDF (probability density function)" data-type="indexterm" id="idm45983144083264"></a><a data-primary="probability density function (PDF)" data-type="indexterm" id="idm45983144082464"></a>It is important to understand that the likelihood function is <em>not</em> a probability distribution: if you integrate a probability distribution over all possible values of <em>x</em>, you always get 1, but if you integrate the likelihood function over all possible values of <em>θ</em> the result can be any positive value.</p>
+<p>Given a dataset <strong>X</strong>, a common task is to try to estimate the most likely values for the model parameters. To do this, you must find the values that maximize the likelihood function, given <strong>X</strong>. <a data-primary="maximum likelihood estimate (MLE)" data-type="indexterm" id="idm45983144078480"></a><a data-primary="MLE (maximum likelihood estimate)" data-type="indexterm" id="idm45983144077776"></a>In this example, if you have observed a single instance <em>x</em>=2.5, the <em>maximum likelihood estimate</em> (MLE) of <em>θ</em> is <math xmlns="http://www.w3.org/1998/Math/MathML"><mover><mi mathvariant="bold">θ</mi><mo>^</mo></mover></math>=1.5. If a prior probability distribution <em>g</em> over <em>θ</em> exists, it is possible to take it into account by maximizing ℒ(<em>θ</em>|<em>x</em>)g(<em>θ</em>) rather than just maximizing ℒ(<em>θ</em>|<em>x</em>). <a data-primary="MAP (maximum a-posteriori) estimation" data-type="indexterm" id="idm45983144071312"></a><a data-primary="maximum a-posteriori (MAP) estimation" data-type="indexterm" id="idm45983144070512"></a>This is called <em>maximum a-posteriori</em> (MAP) estimation. Since MAP constrains the parameter values, you can think of it as a regularized version of MLE.</p>
+<p>Notice that maximizing the likelihood function is equivalent to maximizing its logarithm (represented in the lower-right plot in <a data-type="xref" href="#likelihood_function_plot">Figure 9-19</a>). Indeed, the logarithm is a strictly increasing function, so if <em>θ</em> maximizes the log likelihood, it also maximizes the likelihood. It turns out that it is generally easier to maximize the log likelihood. For example, if you observed several independent instances <em>x</em><sup>(1)</sup> to <em>x</em><sup>(<em>m</em>)</sup>, you would need to find the value of <em>θ</em> that maximizes the product of the individual likelihood functions. But it is equivalent, and much simpler, to maximize the sum (not the product) of the log likelihood functions, thanks to the magic of the logarithm which converts products into sums: log(<em>ab</em>) = log(<em>a</em>) + log(<em>b</em>).</p>
+<p>Once you have estimated <math xmlns="http://www.w3.org/1998/Math/MathML"><mover><mi mathvariant="bold">θ</mi><mo>^</mo></mover></math>, the value of <em>θ</em> that maximizes the likelihood function, then you are ready to compute <math xmlns="http://www.w3.org/1998/Math/MathML"><mover><mi mathvariant="script">L</mi><mo>^</mo></mover><mo>=</mo><mo mathvariant="script">L</mo><mo>(</mo><mover><mi mathvariant="bold">θ</mi><mo>^</mo></mover><mo>,</mo><mi mathvariant="bold">X</mi><mo>)</mo></math>, which is the value used to compute the AIC and BIC; you can think of it as a measure of how well the model fits the data.<a data-primary="" data-startref="ix_gmm_select_cluster" data-type="indexterm" id="idm45983144057376"></a><a data-primary="" data-startref="ix_likelihood" data-type="indexterm" id="idm45983144056432"></a><a data-primary="" data-startref="ix_prob_likely" data-type="indexterm" id="idm45983144055488"></a></p>
+</div>
+</aside>
+<p>To compute the BIC and AIC, call the <code>bic()</code> and <code>aic()</code> methods:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">gm</code><code class="o">.</code><code class="n">bic</code><code class="p">(</code><code class="n">X</code><code class="p">)</code>
+<code class="go">8189.747000497186</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">gm</code><code class="o">.</code><code class="n">aic</code><code class="p">(</code><code class="n">X</code><code class="p">)</code>
+<code class="go">8102.521720382148</code></pre>
+<p><a data-type="xref" href="#aic_bic_vs_k_plot">Figure 9-20</a> shows the BIC for different numbers of clusters <em>k</em>. As you can see, both the BIC and the AIC are lowest when <em>k</em>=3, so it is most likely the best choice.</p>
+<figure><div class="figure" id="aic_bic_vs_k_plot">
+<img alt="mls3 0920" height="205" src="../Images/mls3_0920.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-20. </span>AIC and BIC for different numbers of clusters <em>k</em></h6>
+</div>
+</figure>
+</div>
+</section>
+<section data-pdf-bookmark="Bayesian Gaussian Mixture Models" data-type="sect2"><div class="sect2" id="idm45983144146096">
+<h2 id="sigil_toc_id_167" class="sigil_not_in_toc">Bayesian Gaussian Mixture Models</h2>
+<p>Rather than manually searching for the optimal number of clusters, you can use the <code>BayesianGaussianMixture</code> class, which is capable of giving weights equal (or close) to zero to unnecessary clusters. <a data-primary="Scikit-Learn" data-secondary="sklearn.mixture.BayesianGaussianMixture" data-type="indexterm" id="idm45983144023312"></a><a data-primary="Bayesian Gaussian mixtures" data-type="indexterm" id="idm45983144022368"></a><a data-primary="Gaussian mixture model (GMM)" data-secondary="Bayesian Gaussian mixtures" data-type="indexterm" id="idm45983144021728"></a>Set the number of clusters <code>n_components</code> to a value that you have good reason to believe is greater than the optimal number of clusters (this assumes some minimal knowledge about the problem at hand), and the algorithm will eliminate the unnecessary clusters automatically. For example, let’s set the number of clusters to 10 and see what happens:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="kn">from</code> <code class="nn">sklearn.mixture</code> <code class="kn">import</code> <code class="n">BayesianGaussianMixture</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">bgm</code> <code class="o">=</code> <code class="n">BayesianGaussianMixture</code><code class="p">(</code><code class="n">n_components</code><code class="o">=</code><code class="mi">10</code><code class="p">,</code> <code class="n">n_init</code><code class="o">=</code><code class="mi">10</code><code class="p">,</code> <code class="n">random_state</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">bgm</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">X</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">bgm</code><code class="o">.</code><code class="n">weights_</code><code class="o">.</code><code class="n">round</code><code class="p">(</code><code class="mi">2</code><code class="p">)</code>
+<code class="go">array([0.4 , 0.21, 0.4 , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  ])</code></pre>
+<p>Perfect: the algorithm automatically detected that only three clusters are needed, and the resulting clusters are almost identical to the ones in <a data-type="xref" href="#gaussian_mixtures_plot">Figure 9-16</a>.</p>
+<p>A final note about Gaussian mixture models: although they work great on clusters with ellipsoidal shapes, they don’t do so well with clusters of very different shapes. For example, let’s see what happens if we use a Bayesian Gaussian mixture model to cluster the moons dataset (see <a data-type="xref" href="#moons_vs_bgm_plot">Figure 9-21</a>).</p>
+<p>Oops! The algorithm desperately searched for ellipsoids, so it found eight different clusters instead of two. The density estimation is not too bad, so this model could perhaps be used for anomaly detection, but it failed to identify the two moons. To conclude this chapter, let’s take a quick look at a few algorithms capable of dealing with arbitrarily shaped clusters.</p>
+<figure><div class="figure" id="moons_vs_bgm_plot">
+<img alt="mls3 0921" height="198" src="../Images/mls3_0921.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 9-21. </span>Fitting a Gaussian mixture to nonellipsoidal clusters</h6>
+</div>
+</figure>
+</div>
+</section>
+<section data-pdf-bookmark="Other Algorithms for Anomaly and Novelty Detection" data-type="sect2"><div class="sect2" id="idm45983112634784">
+<h2 id="sigil_toc_id_168" class="sigil_not_in_toc">Other Algorithms for Anomaly and Novelty Detection</h2>
+<p>Scikit-Learn implements other algorithms dedicated to anomaly detection or novelty detection:</p>
+<dl>
+<dt>Fast-MCD (minimum covariance determinant)</dt>
+<dd>
+<p>Implemented by the <code>EllipticEnvelope</code> class, this algorithm is useful for outlier detection, in particular to clean up a dataset. <a data-primary="Gaussian mixture model (GMM)" data-secondary="fast-MCD" data-type="indexterm" id="idm45983112629424"></a><a data-primary="fast-MCD" data-type="indexterm" id="idm45983112628576"></a><a data-primary="EllipticEnvelope" data-type="indexterm" id="idm45983112627968"></a>It assumes that the normal instances (inliers) are generated from a single Gaussian distribution (not a mixture). It also assumes that the dataset is contaminated with outliers that were not generated from this Gaussian distribution. When the algorithm estimates the parameters of the Gaussian distribution (i.e., the shape of the elliptic envelope around the inliers), it is careful to ignore the instances that are most likely outliers. This technique gives a better estimation of the elliptic envelope and thus makes the algorithm better at identifying the outliers.</p>
+</dd>
+<dt>Isolation forest</dt>
+<dd>
+<p>This is an efficient algorithm for outlier detection, especially in high-dimensional datasets. <a data-primary="anomaly detection" data-secondary="isolation forest" data-type="indexterm" id="idm45983112625744"></a><a data-primary="Gaussian mixture model (GMM)" data-secondary="isolation forest" data-type="indexterm" id="idm45983112624768"></a><a data-primary="isolation forest" data-type="indexterm" id="idm45983112623856"></a>The algorithm builds a random forest in which each decision tree is grown randomly: at each node, it picks a feature randomly, then it picks a random threshold value (between the min and max values) to split the dataset in two. The dataset gradually gets chopped into pieces this way, until all instances end up isolated from the other instances. Anomalies are usually far from other instances, so on average (across all the decision trees) they tend to get isolated in fewer steps than normal instances.</p>
+</dd>
+<dt>Local outlier factor (LOF)</dt>
+<dd>
+<p>This algorithm is also good for outlier detection. <a data-primary="Gaussian mixture model (GMM)" data-secondary="local outlier factor" data-type="indexterm" id="idm45983112621808"></a><a data-primary="local outlier factor (LOF)" data-type="indexterm" id="idm45983112620864"></a><a data-primary="LOF (local outlier factor)" data-type="indexterm" id="idm45983112620224"></a>It compares the density of instances around a given instance to the density around its neighbors. An anomaly is often more isolated than its <em>k</em>-nearest neighbors.</p>
+</dd>
+<dt>One-class SVM</dt>
+<dd>
+<p>This algorithm is better suited for novelty detection. <a data-primary="support vector machines (SVMs)" data-secondary="one-class SVM" data-type="indexterm" id="idm45983112617504"></a><a data-primary="Gaussian mixture model (GMM)" data-secondary="one-class SVM" data-type="indexterm" id="idm45983112616560"></a><a data-primary="one-class SVM" data-type="indexterm" id="idm45983112615648"></a>Recall that a kernelized SVM classifier separates two classes by first (implicitly) mapping all the instances to a high-dimensional space, then separating the two classes using a linear SVM classifier within this high-dimensional space (see <a data-type="xref" href="HOMLWSKT009.xhtml#svm_chapter">Chapter 5</a>). Since we just have one class of instances, the one-class SVM algorithm instead tries to separate the instances in high-dimensional space from the origin. In the original space, this will correspond to finding a small region that encompasses all the instances. If a new instance does not fall within this region, it is an anomaly. There are a few hyperparameters to tweak: the usual ones for a kernelized SVM, plus a margin hyperparameter that corresponds to the probability of a new instance being mistakenly considered as novel when it is in fact normal. It works great, especially with high-dimensional datasets, but like all SVMs it does not scale to large <span class="keep-together">datasets</span>.</p>
+</dd>
+<dt>PCA and other dimensionality reduction techniques with an <code>inverse_transform()</code> method</dt>
+<dd>
+<p>If you<a data-primary="Gaussian mixture model (GMM)" data-secondary="inverse_transform() with PCA" data-type="indexterm" id="idm45983112611632"></a><a data-primary="inverse_transform()" data-type="indexterm" id="idm45983112610592"></a> compare the reconstruction error of a normal instance with the reconstruction error of an anomaly, the latter will usually be much larger. This is a simple and often quite efficient anomaly detection approach (see this chapter’s exercises for an example).<a data-primary="" data-startref="ix_unsup_learn_ch9" data-type="indexterm" id="idm45983112609792"></a><a data-primary="" data-startref="ix_cluster_alg_gmm" data-type="indexterm" id="idm45983112608848"></a><a data-primary="" data-startref="ix_gaussian_gmm" data-type="indexterm" id="idm45983112607904"></a><a data-primary="" data-startref="ix_unsup_learn_gmm" data-type="indexterm" id="idm45983112606960"></a></p>
+</dd>
+</dl>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Exercises" data-type="sect1"><div class="sect1" id="exercises-ch9">
+<h2 id="sigil_toc_id_169">Exercises</h2>
+<ol>
+<li>
+<p>How would you define clustering? Can you name a few clustering algorithms?</p>
+</li>
+<li>
+<p>What are some of the main applications of clustering algorithms?</p>
+</li>
+<li>
+<p>Describe two techniques to select the right number of clusters when using <span class="keep-together"><em>k</em>-means</span>.</p>
+</li>
+<li>
+<p>What is label propagation? Why would you implement it, and how?</p>
+</li>
+<li>
+<p>Can you name two clustering algorithms that can scale to large datasets? And two that look for regions of high density?</p>
+</li>
+<li>
+<p>Can you think of a use case where active learning would be useful? How would you implement it?</p>
+</li>
+<li>
+<p>What is the difference between anomaly detection and novelty detection?</p>
+</li>
+<li>
+<p>What is a Gaussian mixture? What tasks can you use it for?</p>
+</li>
+<li>
+<p>Can you name two techniques to find the right number of clusters when using a Gaussian mixture model?</p>
+</li>
+<li>
+<p>The classic Olivetti faces dataset contains 400 grayscale 64 × 64–pixel images of faces. Each image is flattened to a 1D vector of size 4,096. Forty different people were photographed (10 times each), and the usual task is to train a model that can predict which person is represented in each picture. Load the dataset using the <code>sklearn.datasets.fetch_olivetti_faces()</code> function, then split it into a training set, a validation set, and a test set (note that the dataset is already scaled between 0 and 1). Since the dataset is quite small, you will probably want to use stratified sampling to ensure that there are the same number of images per person in each set. Next, cluster the images using <em>k</em>-means, and ensure that you have a good number of clusters (using one of the techniques discussed in this chapter). Visualize the clusters: do you see similar faces in each cluster?</p>
+</li>
+<li>
+<p>Continuing with the Olivetti faces dataset, train a classifier to predict which person is represented in each picture, and evaluate it on the validation set. Next, use <em>k</em>-means as a dimensionality reduction tool, and train a classifier on the reduced set. Search for the number of clusters that allows the classifier to get the best performance: what performance can you reach? What if you append the features from the reduced set to the original features (again, searching for the best number of clusters)?</p>
+</li>
+<li>
+<p>Train a Gaussian mixture model on the Olivetti faces dataset. To speed up the algorithm, you should probably reduce the dataset’s dimensionality (e.g., use PCA, preserving 99% of the variance). Use the model to generate some new faces (using the <code>sample()</code> method), and visualize them (if you used PCA, you will need to use its <code>inverse_transform()</code> method). Try to modify some images (e.g., rotate, flip, darken) and see if the model can detect the anomalies (i.e., compare the output of the <code>score_samples()</code> method for normal images and for anomalies).</p>
+</li>
+<li>
+<p>Some dimensionality reduction techniques can also be used for anomaly detection. For example, take the Olivetti faces dataset and reduce it with PCA, preserving 99% of the variance. Then compute the reconstruction error for each image. Next, take some of the modified images you built in the previous exercise and look at their reconstruction error: notice how much larger it is. If you plot a reconstructed image, you will see why: it tries to reconstruct a normal face.</p>
+</li>
+</ol>
+<p>Solutions to these exercises are available at the end of this chapter’s notebook, at <a href="https://homl.info/colab3"><em class="hyperlink">https://homl.info/colab3</em></a>.</p>
+</div>
+</section>
+<div data-type="footnotes"><p data-type="footnote" id="idm45983113882688"><sup><a href="#idm45983113882688-marker">1</a></sup> Stuart P. Lloyd, “Least Squares Quantization in PCM”, <em>IEEE Transactions on Information Theory</em> 28, no. 2 (1982): 129–137.</p>
+<p data-type="footnote" id="idm45983113465888"><sup><a href="#idm45983113465888-marker">2</a></sup> David Arthur and Sergei Vassilvitskii, “<span>k-Means++</span>: The Advantages of Careful Seeding”, <em>Proceedings of the 18th Annual ACM-SIAM Symposium on Discrete Algorithms</em> (2007): 1027–1035.</p>
+<p data-type="footnote" id="idm45983113396528"><sup><a href="#idm45983113396528-marker">3</a></sup> Charles Elkan, “Using the Triangle Inequality to Accelerate k-Means”, <em>Proceedings of the 20th International Conference on Machine Learning</em> (2003): 147–153.</p>
+<p data-type="footnote" id="idm45983113393328"><sup><a href="#idm45983113393328-marker">4</a></sup> The triangle inequality is AC ≤ AB + BC, where A, B and C are three points and AB, AC, and BC are the distances between these points.</p>
+<p data-type="footnote" id="idm45983113390368"><sup><a href="#idm45983113390368-marker">5</a></sup> David Sculley, “Web-Scale K-Means Clustering”, <em>Proceedings of the 19th International Conference on World Wide Web</em> (2010): 1177–1178.</p>
+<p data-type="footnote" id="idm45983144546944"><sup><a href="#idm45983144546944-marker">6</a></sup> Phi (<em>ϕ</em> or <em>φ</em>) is the 21st letter of the Greek alphabet.</p>
+</div>
+</div>
+</section>
+</div>
+</body>
+</html>

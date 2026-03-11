@@ -1,0 +1,1103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+<title>15. Processing Sequences Using RNNs and CNNs</title>
+<link href="../Styles/epub.css" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+<div id="sbo-rt-content"><section data-pdf-bookmark="Chapter 15. Processing Sequences Using RNNs and CNNs" data-type="chapter" epub:type="chapter"><div class="chapter" id="rnn_chapter">
+<h1><span class="label">Chapter 15. </span>Processing Sequences Using <span class="keep-together">RNNs and CNNs</span></h1>
+<p>Predicting the future is something you do all the time, whether you are finishing a friend’s sentence or anticipating the smell of coffee at breakfast. <a data-primary="recurrent neural networks (RNNs)" data-type="indexterm" id="ix_rnns_ch15to16"></a>In this chapter we will discuss recurrent neural networks (RNNs)—a class of nets that can predict the future (well, up to a point). <a data-primary="time series data, forecasting" data-type="indexterm" id="idm45983089459680"></a>RNNs can analyze time series data, such as the number of daily active users on your website, the hourly temperature in your city, your home’s daily power consumption, the trajectories of nearby cars, and more. Once an RNN learns past patterns in the data, it is able to use its knowledge to forecast the future, assuming of course that past patterns still hold in the future.</p>
+<p>More generally, RNNs can work on sequences of arbitrary lengths, rather than on fixed-sized inputs. For example, they can take sentences, documents, or audio samples as input, making them extremely useful for natural language processing applications such as automatic translation or speech-to-text.</p>
+<p>In this chapter, we will first go through the fundamental concepts underlying RNNs and how to train them using backpropagation through time. Then, we will use them to forecast a time series. Along the way, we will look at the popular ARMA family of models, often used to forecast time series, and use them as baselines to compare with our RNNs. After that, we’ll explore the two main difficulties that RNNs face:</p>
+<ul>
+<li>
+<p>Unstable gradients (discussed in <a data-type="xref" href="HOMLWSKT016.xhtml#deep_chapter">Chapter 11</a>), which can be alleviated using various techniques, including <em>recurrent dropout</em> and <em>recurrent layer normalization</em>.<a data-primary="layer normalization" data-type="indexterm" id="idm45983089455216"></a><a data-primary="recurrent layer normalization" data-type="indexterm" id="idm45983089454512"></a><a data-primary="recurrent dropout" data-type="indexterm" id="idm45983089453776"></a></p>
+</li>
+<li>
+<p>A (very) limited short-term memory, which can be extended using LSTM and GRU cells.</p>
+</li>
+</ul>
+<p class="pagebreak-before">RNNs are not the only types of neural networks capable of handling sequential data. For small sequences, a regular dense network can do the trick, and for very long sequences, such as audio samples or text, convolutional neural networks can actually work quite well too. <a data-primary="WaveNet" data-type="indexterm" id="idm45983089451040"></a>We will discuss both of these possibilities, and we will finish this chapter by implementing a WaveNet—a CNN architecture capable of handling sequences of tens of thousands of time steps. Let’s get started!</p>
+<section data-pdf-bookmark="Recurrent Neurons and Layers" data-type="sect1"><div class="sect1" id="idm45983089449856">
+<h2 id="sigil_toc_id_291">Recurrent Neurons and Layers</h2>
+<p>Up to now we have focused on feedforward neural networks, where the activations flow only in one direction, from the input layer to the output layer. <a data-primary="feedforward neural network (FNN)" data-type="indexterm" id="idm45983089448096"></a><a data-primary="FNN (feedforward neural network)" data-type="indexterm" id="idm45983089447328"></a><a data-primary="recurrent neurons" data-type="indexterm" id="idm45983089446640"></a>A recurrent neural network looks very much like a feedforward neural network, except it also has connections pointing backward.</p>
+<p>Let’s look at the simplest possible RNN, composed of one neuron receiving inputs, producing an output, and sending that output back to itself, as shown in <a data-type="xref" href="#simple_rnn_diagram">Figure 15-1</a> (left). At each <em>time step</em> <em>t</em> (also called a <em>frame</em>), this <em>recurrent neuron</em> receives the inputs <strong>x</strong><sub>(<em>t</em>)</sub> as well as its own output from the previous time step, <em>ŷ</em><sub>(<em>t</em>–1)</sub>. Since there is no previous output at the first time step, it is generally set to 0. We can represent this tiny network against the time axis, as shown in <a data-type="xref" href="#simple_rnn_diagram">Figure 15-1</a> (right). <a data-primary="unrolling the network through time" data-type="indexterm" id="idm45983089439120"></a>This is called <em>unrolling the network through time</em> (it’s the same recurrent neuron represented once per time step).</p>
+<figure class="smallerseventy"><div class="figure" id="simple_rnn_diagram">
+<img alt="mls3 1501" height="261" src="../Images/mls3_1501.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-1. </span>A recurrent neuron (left) unrolled through time (right)</h6>
+</div>
+</figure>
+<p>You can easily create a layer of recurrent neurons. At each time step <em>t</em>, every neuron receives both the input vector <strong>x</strong><sub>(<em>t</em>)</sub> and the output vector from the previous time step <strong>ŷ</strong><sub>(<em>t</em>–1)</sub>, as shown in <a data-type="xref" href="#rnn_layer_diagram">Figure 15-2</a>. Note that both the inputs and outputs are now vectors (when there was just a single neuron, the output was a scalar).</p>
+<figure><div class="figure" id="rnn_layer_diagram">
+<img alt="mls3 1502" height="231" src="../Images/mls3_1502.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-2. </span>A layer of recurrent neurons (left) unrolled through time (right)</h6>
+</div>
+</figure>
+<p>Each recurrent neuron has two sets of weights: one for the inputs <strong>x</strong><sub>(<em>t</em>)</sub> and the other for the outputs of the previous time step, <strong>ŷ</strong><sub>(<em>t</em>–1)</sub>. Let’s call these weight vectors <strong>w</strong><sub><em>x</em></sub> and <strong>w</strong><sub><em>ŷ</em></sub>. If we consider the whole recurrent layer instead of just one recurrent neuron, we can place all the weight vectors in two weight matrices: <strong>W</strong><sub><em>x</em></sub> and <strong>W</strong><sub><em>ŷ</em></sub>.</p>
+<p>The output vector of the whole recurrent layer can then be computed pretty much as you might expect, as shown in <a data-type="xref" href="#rnn_output_equation">Equation 15-1</a>, where <strong>b</strong> is the bias vector and <em>ϕ</em>(·) is the activation function (e.g., ReLU⁠<sup><a data-type="noteref" href="#idm45983089419952" id="idm45983089419952-marker">1</a></sup>).</p>
+<div data-type="equation" id="rnn_output_equation"><h5 class="sigil_not_in_toc"><span class="label">Equation 15-1. </span>Output of a recurrent layer for a single instance</h5>
+<math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi mathvariant="bold">ŷ</mi><mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow></msub><mo>=</mo><mi>ϕ</mi><mfenced><mrow><msup><msub><mi mathvariant="bold">W</mi><mi>x</mi></msub><mo>⊺</mo></msup><msub><mi mathvariant="bold">x</mi><mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow></msub><mo> </mo><mo>+</mo><mo> </mo><msup><msub><mi mathvariant="bold">W</mi><mi>ŷ</mi></msub><mo>⊺</mo></msup><msub><mi mathvariant="bold">ŷ</mi><mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow></msub><mo> </mo><mo>+</mo><mo> </mo><mi mathvariant="bold">b</mi></mrow></mfenced></math>
+</div>
+<p>Just as with feedforward neural networks, we can compute a recurrent layer’s output in one shot for an entire mini-batch by placing all the inputs at time step <em>t</em> into an input matrix <strong>X</strong><sub>(<em>t</em>)</sub> (see <a data-type="xref" href="#rnn_output_vectorized_equation">Equation 15-2</a>).</p>
+<div data-type="equation" id="rnn_output_vectorized_equation"><h5 class="sigil_not_in_toc"><span class="label">Equation 15-2. </span>Outputs of a layer of recurrent neurons for all instances in a pass:[<span class="keep-together">mini-batch</span></h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">Ŷ</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mi>ϕ</mi>
+<mfenced close=")" open="(" separators="">
+<msub><mi mathvariant="bold">X</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<msub><mi mathvariant="bold">W</mi> <mi>x</mi> </msub>
+<mo>+</mo>
+<msub><mi mathvariant="bold">Ŷ</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+<msub><mi mathvariant="bold">W</mi> <mi>ŷ</mi> </msub>
+<mo>+</mo>
+<mi mathvariant="bold">b</mi>
+</mfenced>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd/>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mi>ϕ</mi>
+<mfenced close=")" open="(" separators="">
+<mfenced close="]" open="[" separators="">
+<msub><mi mathvariant="bold">X</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mspace width="1.em"/>
+<msub><mi mathvariant="bold">Ŷ</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+</mfenced>
+<mi mathvariant="bold">W</mi>
+<mo>+</mo>
+<mi mathvariant="bold">b</mi>
+</mfenced>
+<mspace width="4.pt"/>
+<mtext>with</mtext>
+<mspace width="4.pt"/>
+<mi mathvariant="bold">W</mi>
+<mo>=</mo>
+<mfenced close="]" open="[" separators="">
+<mtable>
+<mtr>
+<mtd>
+<msub><mi mathvariant="bold">W</mi> <mi>x</mi> </msub>
+</mtd>
+</mtr>
+<mtr>
+<mtd>
+<msub><mi mathvariant="bold">W</mi> <mi>ŷ</mi> </msub>
+</mtd>
+</mtr>
+</mtable>
+</mfenced>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>In this equation:</p>
+<ul>
+<li>
+<p><strong>Ŷ</strong><sub>(<em>t</em>)</sub> is an <em>m</em> × <em>n</em><sub>neurons</sub> matrix containing the layer’s outputs at time step <em>t</em> for each instance in the mini-batch (<em>m</em> is the number of instances in the mini-batch and <em>n</em><sub>neurons</sub> is the number of neurons).</p>
+</li>
+<li>
+<p><strong>X</strong><sub>(<em>t</em>)</sub> is an <em>m</em> × <em>n</em><sub>inputs</sub> matrix containing the inputs for all instances (<em>n</em><sub>inputs</sub> is the number of input features).</p>
+</li>
+<li>
+<p><strong>W</strong><sub><em>x</em></sub> is an <em>n</em><sub>inputs</sub> × <em>n</em><sub>neurons</sub> matrix containing the connection weights for the inputs of the current time step.</p>
+</li>
+<li>
+<p><strong>W</strong><sub><em>ŷ</em></sub> is an <em>n</em><sub>neurons</sub> × <em>n</em><sub>neurons</sub> matrix containing the connection weights for the outputs of the previous time step.</p>
+</li>
+<li>
+<p><strong>b</strong> is a vector of size <em>n</em><sub>neurons</sub> containing each neuron’s bias term.</p>
+</li>
+<li>
+<p>The weight matrices <strong>W</strong><sub><em>x</em></sub> and <strong>W</strong><sub><em>ŷ</em></sub> are often concatenated vertically into a single weight matrix <strong>W</strong> of shape (<em>n</em><sub>inputs</sub> + <em>n</em><sub>neurons</sub>) × <em>n</em><sub>neurons</sub> (see the second line of <a data-type="xref" href="#rnn_output_vectorized_equation">Equation 15-2</a>).</p>
+</li>
+<li>
+<p>The notation [<strong>X</strong><sub>(<em>t</em>)</sub> <strong>Ŷ</strong><sub>(<em>t</em>–1)</sub>] represents the horizontal concatenation of the matrices <strong>X</strong><sub>(<em>t</em>)</sub> and <strong>Ŷ</strong><sub>(<em>t</em>–1)</sub>.</p>
+</li>
+</ul>
+<p>Notice that <strong>Ŷ</strong><sub>(<em>t</em>)</sub> is a function of <strong>X</strong><sub>(<em>t</em>)</sub> and <strong>Ŷ</strong><sub>(<em>t</em>–1)</sub>, which is a function of <strong>X</strong><sub>(<em>t</em>–1)</sub> and <strong>Ŷ</strong><sub>(<em>t</em>–2)</sub>, which is a function of <strong>X</strong><sub>(<em>t</em>–2)</sub> and <strong>Ŷ</strong><sub>(<em>t</em>–3)</sub>, and so on. This makes <strong>Ŷ</strong><sub>(<em>t</em>)</sub> a function of all the inputs since time <em>t</em> = 0 (that is, <strong>X</strong><sub>(0)</sub>, <strong>X</strong><sub>(1)</sub>, …, <strong>X</strong><sub>(<em>t</em>)</sub>). At the first time step, <em>t</em> = 0, there are no previous outputs, so they are typically assumed to be all zeros.</p>
+<section data-pdf-bookmark="Memory Cells" data-type="sect2"><div class="sect2" id="idm45983089328432">
+<h2 id="sigil_toc_id_292" class="sigil_not_in_toc">Memory Cells</h2>
+<p>Since the output of a recurrent neuron at time step <em>t</em> is a function of all the inputs from previous time steps, you could say it has a form of <em>memory</em>. <a data-primary="recurrent neural networks (RNNs)" data-secondary="memory cells" data-type="indexterm" id="idm45983089312992"></a><a data-primary="memory cells (cells), RNNs" data-type="indexterm" id="idm45983089312016"></a>A part of a neural network that preserves some state across time steps is called a <em>memory cell</em> (or simply a <em>cell</em>). A single recurrent neuron, or a layer of recurrent neurons, is a very basic cell, capable of learning only short patterns (typically about 10 steps long, but this varies depending on the task). Later in this chapter, we will look at some more complex and powerful types of cells capable of learning longer patterns (roughly 10 times longer, but again, this depends on the task).</p>
+<p>A cell’s state at time step <em>t</em>, denoted <strong>h</strong><sub>(<em>t</em>)</sub> (the “h” stands for “hidden”), is a function of some inputs at that time step and its state at the previous time step: <strong>h</strong><sub>(<em>t</em>)</sub> = <em>f</em>(<strong>x</strong><sub>(<em>t</em>)</sub>, <strong>h</strong><sub>(<em>t</em>–1)</sub>). Its output at time step <em>t</em>, denoted <strong>ŷ</strong><sub>(<em>t</em>)</sub>, is also a function of the previous state and the current inputs. In the case of the basic cells we have discussed so far, the output is just equal to the state, but in more complex cells this is not always the case, as shown in <a data-type="xref" href="#hidden_state_diagram">Figure 15-3</a>.</p>
+<figure class="smallerseventy"><div class="figure" id="hidden_state_diagram">
+<img alt="mls3 1503" height="264" src="../Images/mls3_1503.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-3. </span>A cell’s hidden state and its output may be different</h6>
+</div>
+</figure>
+</div>
+</section>
+<section data-pdf-bookmark="Input and Output Sequences" data-type="sect2"><div class="sect2" id="idm45983089299120">
+<h2 id="sigil_toc_id_293" class="sigil_not_in_toc">Input and Output Sequences</h2>
+<p>An RNN can simultaneously take a sequence of inputs and produce a sequence of outputs (see the top-left network in <a data-type="xref" href="#seq_to_seq_diagram">Figure 15-4</a>). <a data-primary="time series data, forecasting" data-secondary="with sequence-to-sequence model" data-secondary-sortas="sequence-to-sequence model" data-type="indexterm" id="idm45983089296464"></a><a data-primary="sequence-to-sequence (seq2seq) network" data-type="indexterm" id="idm45983089295312"></a><a data-primary="input and output sequences, RNNs" data-type="indexterm" id="ix_input_output_rnns"></a><a data-primary="recurrent neural networks (RNNs)" data-secondary="input and output sequences" data-type="indexterm" id="ix_rnns_input_output"></a>This type of <em>sequence-to-sequence network</em> is useful to forecast time series, such as your home’s daily power consumption: you feed it the data over the last <em>N</em> days, and you train it to output the power consumption shifted by one day into the future (i.e., from <em>N</em> – 1 days ago to tomorrow).</p>
+<p>Alternatively, you could feed the network a sequence of inputs and ignore all outputs except for the last one (see the top-right network in <a data-type="xref" href="#seq_to_seq_diagram">Figure 15-4</a>). <a data-primary="sequence-to-vector network" data-type="indexterm" id="idm45983089289504"></a>This is a <em>sequence-to-vector network</em>. For example, you could feed the network a sequence of words corresponding to a movie review, and the network would output a sentiment score (e.g., from 0 [hate] to 1 [love]).</p>
+<p>Conversely, you could feed the network the same input vector over and over again at each time step and let it output a sequence (see the bottom-left network of <a data-type="xref" href="#seq_to_seq_diagram">Figure 15-4</a>). <a data-primary="vector-to-sequence network" data-type="indexterm" id="idm45983089286832"></a>This is a <em>vector-to-sequence network</em>. For example, the input could be an image (or the output of a CNN), and the output could be a caption for that image.</p>
+<p>Lastly, you could have a sequence-to-vector network, called an <em>encoder</em>, followed by a vector-to-sequence network, called a <em>decoder</em> (see the bottom-right network of <a data-type="xref" href="#seq_to_seq_diagram">Figure 15-4</a>). For example, this could be used for translating a sentence from one language to another. You would feed the network a sentence in one language, the encoder would convert this sentence into a single vector representation, and then the decoder would decode this vector into a sentence in another language. <a data-primary="encoder–decoder models" data-seealso="attention mechanisms" data-type="indexterm" id="idm45983089282480"></a>This two-step model, called an <a href="https://homl.info/seq2seq"><em>encoder–decoder</em></a>,⁠<sup><a data-type="noteref" href="#idm45983089280464" id="idm45983089280464-marker">2</a></sup> works much better than trying to translate on the fly with a single sequence-to-sequence RNN (like the one represented at the top left): the last words of a sentence can affect the first words of the translation, so you need to wait until you have seen the whole sentence before translating it. We will go through the implementation of an encoder–decoder in <a data-type="xref" href="HOMLWSKT021.xhtml#nlp_chapter">Chapter 16</a> (as you will see, it is a bit more complex than what <a data-type="xref" href="#seq_to_seq_diagram">Figure 15-4</a> suggests).</p>
+<figure><div class="figure" id="seq_to_seq_diagram">
+<img alt="mls3 1504" height="389" src="../Images/mls3_1504.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-4. </span>Sequence-to-sequence (top left), sequence-to-vector (top right), vector-to-sequence (bottom left), and encoder–decoder (bottom right) networks</h6>
+</div>
+</figure>
+<p>This versatility sounds promising, but how do you train a recurrent neural network?<a data-primary="" data-startref="ix_rnns_input_output" data-type="indexterm" id="idm45983089275280"></a><a data-primary="" data-startref="ix_input_output_rnns" data-type="indexterm" id="idm45983089274304"></a></p>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Training RNNs" data-type="sect1"><div class="sect1" id="idm45983089449264">
+<h2 id="sigil_toc_id_294">Training RNNs</h2>
+<p>To train an RNN, the trick is to unroll it through time (like we just did) and then use regular backpropagation (see <a data-type="xref" href="#bptt_diagram">Figure 15-5</a>). This strategy is called <em>backpropagation through time</em> (BPTT).<a data-primary="recurrent neural networks (RNNs)" data-secondary="training" data-type="indexterm" id="idm45983089270608"></a><a data-primary="backpropagation through time (BPTT)" data-type="indexterm" id="idm45983089269616"></a><a data-primary="BPTT (backpropagation through time)" data-type="indexterm" id="idm45983089268928"></a></p>
+<p>Just like in regular backpropagation, there is a first forward pass through the unrolled network (represented by the dashed arrows). Then the output sequence is evaluated using a loss function ℒ(<strong>Y</strong><sub>(0)</sub>, <strong>Y</strong><sub>(1)</sub>, …, <strong>Y</strong><sub>(<em>T</em>)</sub>; <strong>Ŷ</strong><sub>(0)</sub>, <strong>Ŷ</strong><sub>(1)</sub>, …, <strong>Ŷ</strong><sub>(<em>T</em>)</sub>) (where <strong>Y</strong><sub>(<em>i</em>)</sub> is the <em>i</em><sup>th</sup> target, <strong>Ŷ</strong><sub>(<em>i</em>)</sub> is the <em>i</em><sup>th</sup> prediction, and <em>T</em> is the max time step). Note that this loss function may ignore some outputs. For example, in a sequence-to-vector RNN, all outputs are ignored except for the very last one. In <a data-type="xref" href="#bptt_diagram">Figure 15-5</a>, the loss function is computed based on the last three outputs only. The gradients of that loss function are then propagated backward through the unrolled network (represented by the solid arrows). In this example, since the outputs <strong>Ŷ</strong><sub>(0)</sub> and <strong>Ŷ</strong><sub>(1)</sub> are not used to compute the loss, the gradients do not flow backward through them; they only flow through <strong>Ŷ</strong><sub>(2)</sub>, <strong>Ŷ</strong><sub>(3)</sub>, and <strong>Ŷ</strong><sub>(4)</sub>. Moreover, since the same parameters <strong>W</strong> and <strong>b</strong> are used at each time step, their gradients will be tweaked multiple times during backprop. Once the backward phase is complete and all the gradients have been computed, BPTT can perform a gradient descent step to update the parameters (this is no different from regular backprop).</p>
+<figure class="width-60"><div class="figure" id="bptt_diagram">
+<img alt="mls3 1505" height="480" src="../Images/mls3_1505.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-5. </span>Backpropagation through time</h6>
+</div>
+</figure>
+<p>Fortunately, Keras takes care of all of this complexity for you, as you will see. But before we get there, let’s load a time series and start analyzing it using classical tools to better understand what we’re dealing with, and to get some baseline metrics.</p>
+</div>
+</section>
+<section data-pdf-bookmark="Forecasting a Time Series" data-type="sect1"><div class="sect1" id="idm45983089249552">
+<h2 id="sigil_toc_id_295">Forecasting a Time Series</h2>
+<p>All right! Let’s pretend you’ve just been hired as a data scientist by Chicago’s Transit Authority. <a data-primary="time series data, forecasting" data-type="indexterm" id="ix_time_series_ch15"></a>Your first task is to build a model capable of forecasting the number of passengers that will ride on bus and rail the next day. You have access to daily ridership data since 2001. Let’s walk through together how you would handle this. We’ll start by loading and cleaning up the data:<sup><a data-type="noteref" href="#idm45983089245360" id="idm45983089245360-marker">3</a></sup></p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">import</code> <code class="nn">pandas</code> <code class="k">as</code> <code class="nn">pd</code>
+<code class="kn">from</code> <code class="nn">pathlib</code> <code class="kn">import</code> <code class="n">Path</code>
+
+<code class="n">path</code> <code class="o">=</code> <code class="n">Path</code><code class="p">(</code><code class="s2">"datasets/ridership/CTA_-_Ridership_-_Daily_Boarding_Totals.csv"</code><code class="p">)</code>
+<code class="n">df</code> <code class="o">=</code> <code class="n">pd</code><code class="o">.</code><code class="n">read_csv</code><code class="p">(</code><code class="n">path</code><code class="p">,</code> <code class="n">parse_dates</code><code class="o">=</code><code class="p">[</code><code class="s2">"service_date"</code><code class="p">])</code>
+<code class="n">df</code><code class="o">.</code><code class="n">columns</code> <code class="o">=</code> <code class="p">[</code><code class="s2">"date"</code><code class="p">,</code> <code class="s2">"day_type"</code><code class="p">,</code> <code class="s2">"bus"</code><code class="p">,</code> <code class="s2">"rail"</code><code class="p">,</code> <code class="s2">"total"</code><code class="p">]</code>  <code class="c1"># shorter names</code>
+<code class="n">df</code> <code class="o">=</code> <code class="n">df</code><code class="o">.</code><code class="n">sort_values</code><code class="p">(</code><code class="s2">"date"</code><code class="p">)</code><code class="o">.</code><code class="n">set_index</code><code class="p">(</code><code class="s2">"date"</code><code class="p">)</code>
+<code class="n">df</code> <code class="o">=</code> <code class="n">df</code><code class="o">.</code><code class="n">drop</code><code class="p">(</code><code class="s2">"total"</code><code class="p">,</code> <code class="n">axis</code><code class="o">=</code><code class="mi">1</code><code class="p">)</code>  <code class="c1"># no need for total, it's just bus + rail</code>
+<code class="n">df</code> <code class="o">=</code> <code class="n">df</code><code class="o">.</code><code class="n">drop_duplicates</code><code class="p">()</code>  <code class="c1"># remove duplicated months (2011-10 and 2014-07)</code></pre>
+<p>We load the CSV file, set short column names, sort the rows by date, remove the redundant <code>total</code> column, and drop duplicate rows. Now let’s check what the first few rows look like:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">df</code><code class="o">.</code><code class="n">head</code><code class="p">()</code>
+<code class="go">           day_type     bus    rail</code>
+<code class="go">date</code>
+<code class="go">2001-01-01        U  297192  126455</code>
+<code class="go">2001-01-02        W  780827  501952</code>
+<code class="go">2001-01-03        W  824923  536432</code>
+<code class="go">2001-01-04        W  870021  550011</code>
+<code class="go">2001-01-05        W  890426  557917</code></pre>
+<p>On January 1st, 2001, 297,192 people boarded a bus in Chicago, and 126,455 boarded a train. The <code>day_type</code> column contains <code>W</code> for <strong>W</strong>eekdays, <code>A</code> for S<strong>a</strong>turdays, and <code>U</code> for S<strong>u</strong>ndays or holidays.</p>
+<p>Now let’s plot the bus and rail ridership figures over a few months in 2019, to see what it looks like (see <a data-type="xref" href="#daily_ridership_plot">Figure 15-6</a>):</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">import</code> <code class="nn">matplotlib.pyplot</code> <code class="k">as</code> <code class="nn">plt</code>
+
+<code class="n">df</code><code class="p">[</code><code class="s2">"2019-03"</code><code class="p">:</code><code class="s2">"2019-05"</code><code class="p">]</code><code class="o">.</code><code class="n">plot</code><code class="p">(</code><code class="n">grid</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">marker</code><code class="o">=</code><code class="s2">"."</code><code class="p">,</code> <code class="n">figsize</code><code class="o">=</code><code class="p">(</code><code class="mi">8</code><code class="p">,</code> <code class="mf">3.5</code><code class="p">))</code>
+<code class="n">plt</code><code class="o">.</code><code class="n">show</code><code class="p">()</code></pre>
+<figure><div class="figure" id="daily_ridership_plot">
+<img alt="mls3 1506" height="240" src="../Images/mls3_1506.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-6. </span>Daily ridership in Chicago</h6>
+</div>
+</figure>
+<p class="pagebreak-before">Note that Pandas includes both the start and end month in the range, so this plots the data from the 1st of March all the way up to the 31st of May. This is a <em>time series</em>: data with values at different time steps, usually at regular intervals. <a data-primary="time series data, forecasting" data-secondary="multivariate time series" data-type="indexterm" id="idm45983089017120"></a><a data-primary="univariate time series" data-type="indexterm" id="idm45983089016208"></a><a data-primary="multivariate time series" data-type="indexterm" id="idm45983089015536"></a>More specifically, since there are multiple values per time step, this is called a <em>multivariate time series</em>. If we only looked at the <code>bus</code> column, it would be a <em>univariate time series</em>, with a single value per time step. Predicting future values (i.e., forecasting) is the most typical task when dealing with time series, and this is what we will focus on in this chapter. Other tasks include imputation (filling in missing past values), classification, anomaly detection, and more.</p>
+<p>Looking at <a data-type="xref" href="#daily_ridership_plot">Figure 15-6</a>, we can see that a similar pattern is clearly repeated every week. <a data-primary="seasonality, time series modeling" data-type="indexterm" id="idm45983089008672"></a>This is called a weekly <em>seasonality</em>. In fact, it’s so strong in this case that forecasting tomorrow’s ridership by just copying the values from a week earlier will yield reasonably good results. <a data-primary="naive forecasting" data-type="indexterm" id="idm45983089007488"></a>This is called <em>naive forecasting</em>: simply copying a past value to make our forecast. Naive forecasting is often a great baseline, and it can even be tricky to beat in some cases.</p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>In general, naive forecasting means copying the latest known value (e.g., forecasting that tomorrow will be the same as today). However, in our case, copying the value from the previous week works better, due to the strong weekly seasonality.</p>
+</div>
+<p>To visualize these naive forecasts, let’s overlay the two time series (for bus and rail) as well as the same time series lagged by one week (i.e., shifted toward the right) using dotted lines. We’ll also plot the difference between the two (i.e., the value at time <em>t</em> minus the value at time <em>t</em> – 7); <a data-primary="differencing, time series forecasting" data-type="indexterm" id="idm45983089003184"></a>this is called <em>differencing</em> (see <a data-type="xref" href="#differencing_plot">Figure 15-7</a>):</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">diff_7</code> <code class="o">=</code> <code class="n">df</code><code class="p">[[</code><code class="s2">"bus"</code><code class="p">,</code> <code class="s2">"rail"</code><code class="p">]]</code><code class="o">.</code><code class="n">diff</code><code class="p">(</code><code class="mi">7</code><code class="p">)[</code><code class="s2">"2019-03"</code><code class="p">:</code><code class="s2">"2019-05"</code><code class="p">]</code>
+
+<code class="n">fig</code><code class="p">,</code> <code class="n">axs</code> <code class="o">=</code> <code class="n">plt</code><code class="o">.</code><code class="n">subplots</code><code class="p">(</code><code class="mi">2</code><code class="p">,</code> <code class="mi">1</code><code class="p">,</code> <code class="n">sharex</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">figsize</code><code class="o">=</code><code class="p">(</code><code class="mi">8</code><code class="p">,</code> <code class="mi">5</code><code class="p">))</code>
+<code class="n">df</code><code class="o">.</code><code class="n">plot</code><code class="p">(</code><code class="n">ax</code><code class="o">=</code><code class="n">axs</code><code class="p">[</code><code class="mi">0</code><code class="p">],</code> <code class="n">legend</code><code class="o">=</code><code class="kc">False</code><code class="p">,</code> <code class="n">marker</code><code class="o">=</code><code class="s2">"."</code><code class="p">)</code>  <code class="c1"># original time series</code>
+<code class="n">df</code><code class="o">.</code><code class="n">shift</code><code class="p">(</code><code class="mi">7</code><code class="p">)</code><code class="o">.</code><code class="n">plot</code><code class="p">(</code><code class="n">ax</code><code class="o">=</code><code class="n">axs</code><code class="p">[</code><code class="mi">0</code><code class="p">],</code> <code class="n">grid</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">legend</code><code class="o">=</code><code class="kc">False</code><code class="p">,</code> <code class="n">linestyle</code><code class="o">=</code><code class="s2">":"</code><code class="p">)</code>  <code class="c1"># lagged</code>
+<code class="n">diff_7</code><code class="o">.</code><code class="n">plot</code><code class="p">(</code><code class="n">ax</code><code class="o">=</code><code class="n">axs</code><code class="p">[</code><code class="mi">1</code><code class="p">],</code> <code class="n">grid</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">marker</code><code class="o">=</code><code class="s2">"."</code><code class="p">)</code>  <code class="c1"># 7-day difference time series</code>
+<code class="n">plt</code><code class="o">.</code><code class="n">show</code><code class="p">()</code></pre>
+<p>Not too bad! Notice how closely the lagged time series track the actual time series. <a data-primary="autocorrelated time series" data-type="indexterm" id="idm45983088997088"></a>When a time series is correlated with a lagged version of itself, we say that the time series is <em>autocorrelated</em>. As you can see, most of the differences are fairly small, except at the end of May. Maybe there was a holiday at that time? Let’s check the <code>day_type</code> column:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="nb">list</code><code class="p">(</code><code class="n">df</code><code class="o">.</code><code class="n">loc</code><code class="p">[</code><code class="s2">"2019-05-25"</code><code class="p">:</code><code class="s2">"2019-05-27"</code><code class="p">][</code><code class="s2">"day_type"</code><code class="p">])</code>
+<code class="go">['A', 'U', 'U']</code></pre>
+<figure><div class="figure" id="differencing_plot">
+<img alt="mls3 1507" height="359" src="../Images/mls3_1507.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-7. </span>Time series overlaid with 7-day lagged time series (top), and difference between <em>t</em> and <em>t</em> – 7 (bottom)</h6>
+</div>
+</figure>
+<p>Indeed, there was a long weekend back then: the Monday was the Memorial Day holiday. We could use this column to improve our forecasts, but for now let’s just measure the mean absolute error over the three-month period we’re arbitrarily focusing on—March, April, and May 2019—to get a rough idea:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">diff_7</code><code class="o">.</code><code class="n">abs</code><code class="p">()</code><code class="o">.</code><code class="n">mean</code><code class="p">()</code>
+<code class="go">bus     43915.608696</code>
+<code class="go">rail    42143.271739</code>
+<code class="go">dtype: float64</code></pre>
+<p>Our naive forecasts get an MAE of about 43,916 bus riders, and about 42,143 rail riders. It’s hard to tell at a glance how good or bad this is, so let’s put the forecast errors into perspective by dividing them by the target values:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">targets</code> <code class="o">=</code> <code class="n">df</code><code class="p">[[</code><code class="s2">"bus"</code><code class="p">,</code> <code class="s2">"rail"</code><code class="p">]][</code><code class="s2">"2019-03"</code><code class="p">:</code><code class="s2">"2019-05"</code><code class="p">]</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="p">(</code><code class="n">diff_7</code> <code class="o">/</code> <code class="n">targets</code><code class="p">)</code><code class="o">.</code><code class="n">abs</code><code class="p">()</code><code class="o">.</code><code class="n">mean</code><code class="p">()</code>
+<code class="go">bus     0.082938</code>
+<code class="go">rail    0.089948</code>
+<code class="go">dtype: float64</code></pre>
+<p>What we just computed is called the <em>mean absolute percentage error</em> (MAPE): it looks like our naive forecasts give us a MAPE of roughly 8.3% for bus and 9.0% for rail. <a data-primary="MAPE (mean absolute percentage error)" data-type="indexterm" id="idm45983088731776"></a><a data-primary="mean absolute percentage error (MAPE)" data-type="indexterm" id="idm45983088731168"></a>It’s interesting to note that the MAE for the rail forecasts looks slightly better than the MAE for the bus forecasts, while the opposite is true for the MAPE. That’s because the bus ridership is larger than the rail ridership, so naturally the forecast errors are also larger, but when we put the errors into perspective, it turns out that the bus forecasts are actually slightly better than the rail forecasts.</p>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>The MAE, MAPE, and MSE are among the most common metrics you can use to evaluate your forecasts. As always, choosing the right metric depends on the task. For example, if your project suffers quadratically more from large errors than from small ones, then the MSE may be preferable, as it strongly penalizes large errors.</p>
+</div>
+<p>Looking at the time series, there doesn’t appear to be any significant monthly seasonality, but let’s check whether there’s any yearly seasonality. We’ll look at the data from 2001 to 2019. To reduce the risk of data snooping, we’ll ignore more recent data for now. Let’s also plot a 12-month rolling average for each series to visualize long-term trends (see <a data-type="xref" href="#long_term_ridership_plot">Figure 15-8</a>):</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">period</code> <code class="o">=</code> <code class="nb">slice</code><code class="p">(</code><code class="s2">"2001"</code><code class="p">,</code> <code class="s2">"2019"</code><code class="p">)</code>
+<code class="n">df_monthly</code> <code class="o">=</code> <code class="n">df</code><code class="o">.</code><code class="n">resample</code><code class="p">(</code><code class="s1">'M'</code><code class="p">)</code><code class="o">.</code><code class="n">mean</code><code class="p">()</code>  <code class="c1"># compute the mean for each month</code>
+<code class="n">rolling_average_12_months</code> <code class="o">=</code> <code class="n">df_monthly</code><code class="p">[</code><code class="n">period</code><code class="p">]</code><code class="o">.</code><code class="n">rolling</code><code class="p">(</code><code class="n">window</code><code class="o">=</code><code class="mi">12</code><code class="p">)</code><code class="o">.</code><code class="n">mean</code><code class="p">()</code>
+
+<code class="n">fig</code><code class="p">,</code> <code class="n">ax</code> <code class="o">=</code> <code class="n">plt</code><code class="o">.</code><code class="n">subplots</code><code class="p">(</code><code class="n">figsize</code><code class="o">=</code><code class="p">(</code><code class="mi">8</code><code class="p">,</code> <code class="mi">4</code><code class="p">))</code>
+<code class="n">df_monthly</code><code class="p">[</code><code class="n">period</code><code class="p">]</code><code class="o">.</code><code class="n">plot</code><code class="p">(</code><code class="n">ax</code><code class="o">=</code><code class="n">ax</code><code class="p">,</code> <code class="n">marker</code><code class="o">=</code><code class="s2">"."</code><code class="p">)</code>
+<code class="n">rolling_average_12_months</code><code class="o">.</code><code class="n">plot</code><code class="p">(</code><code class="n">ax</code><code class="o">=</code><code class="n">ax</code><code class="p">,</code> <code class="n">grid</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">legend</code><code class="o">=</code><code class="kc">False</code><code class="p">)</code>
+<code class="n">plt</code><code class="o">.</code><code class="n">show</code><code class="p">()</code></pre>
+<figure><div class="figure" id="long_term_ridership_plot">
+<img alt="mls3 1508" height="279" src="../Images/mls3_1508.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-8. </span>Yearly seasonality and long-term trends</h6>
+</div>
+</figure>
+<p>Yep! There’s definitely some yearly seasonality as well, although it is noisier than the weekly seasonality, and more visible for the rail series than the bus series: we see peaks and troughs at roughly the same dates each year. Let’s check what we get if we plot the 12-month difference (see <a data-type="xref" href="#yearly_diff_plot">Figure 15-9</a>):</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">df_monthly</code><code class="o">.</code><code class="n">diff</code><code class="p">(</code><code class="mi">12</code><code class="p">)[</code><code class="n">period</code><code class="p">]</code><code class="o">.</code><code class="n">plot</code><code class="p">(</code><code class="n">grid</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">marker</code><code class="o">=</code><code class="s2">"."</code><code class="p">,</code> <code class="n">figsize</code><code class="o">=</code><code class="p">(</code><code class="mi">8</code><code class="p">,</code> <code class="mi">3</code><code class="p">))</code>
+<code class="n">plt</code><code class="o">.</code><code class="n">show</code><code class="p">()</code></pre>
+<figure><div class="figure" id="yearly_diff_plot">
+<img alt="mls3 1509" height="201" src="../Images/mls3_1509.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-9. </span>The 12-month difference</h6>
+</div>
+</figure>
+<p>Notice how differencing not only removed the yearly seasonality, but it also removed the long-term trends. <a data-primary="differencing, time series forecasting" data-type="indexterm" id="idm45983088519216"></a>For example, the linear downward trend present in the time series from 2016 to 2019 became a roughly constant negative value in the differenced time series. <a data-primary="stationary time series" data-type="indexterm" id="idm45983088518416"></a>In fact, differencing is a common technique used to remove trend and seasonality from a time series: it’s easier to study a <em>stationary</em> time series, meaning one whose statistical properties remain constant over time, without any seasonality or trends. Once you’re able to make accurate forecasts on the differenced time series, it’s easy to turn them into forecasts for the actual time series by just adding back the past values that were previously subtracted.</p>
+<p>You may be thinking that we’re only trying to predict tomorrow’s ridership, so the long-term patterns matter much less than the short-term ones. You’re right, but still, we may be able to improve performance slightly by taking long-term patterns into account. For example, daily bus ridership dropped by about 2,500 in October 2017, which represents about 570 fewer passengers each week, so if we were at the end of October 2017, it would make sense to forecast tomorrow’s ridership by copying the value from last week, minus 570. Accounting for the trend will make your forecasts a bit more accurate on average.</p>
+<p>Now that you’re familiar with the ridership time series, as well as some of the most important concepts in time series analysis, including seasonality, trend, differencing, and moving averages, let’s take a quick look at a very popular family of statistical models that are commonly used to analyze time series.</p>
+<section class="less_space pagebreak-before" data-pdf-bookmark="The ARMA Model Family" data-type="sect2"><div class="sect2" id="idm45983088546512">
+<h2 id="sigil_toc_id_296" class="sigil_not_in_toc">The ARMA Model Family</h2>
+<p>We’ll start with the <em>autoregressive moving average</em> (ARMA) model, developed by Herman Wold in the 1930s: it computes its forecasts using a simple weighted sum of lagged values and corrects these forecasts by adding a moving average, very much like we just discussed. Specifically, the moving average component is computed using a weighted sum of the last few forecast errors. <a data-type="xref" href="#arma_equation">Equation 15-3</a> shows how the model makes its forecasts.<a data-primary="autoregressive moving average (ARMA) model family" data-type="indexterm" id="ix_autoregress_arma"></a><a data-primary="ARMA model family" data-type="indexterm" id="ix_arma_fam_time_series"></a><a data-primary="time series data, forecasting" data-secondary="ARMA model family" data-type="indexterm" id="ix_time_series_arma"></a></p>
+<div data-type="equation" id="arma_equation">
+<h5 class="sigil_not_in_toc"><span class="label">Equation 15-3. </span>Forecasting using an ARMA model</h5>
+<math xmlns="http://www.w3.org/1998/Math/MathML"><mtable columnalign="left"><mtr><mtd><msub><mover><mi>y</mi><mo>^</mo></mover><mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow></msub><mo>=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>α</mi><mi>i</mi></msub><mo> </mo><msub><mi>y</mi><mrow><mo>(</mo><mi>t</mi><mo>-</mo><mi>i</mi><mo>)</mo></mrow></msub><mo>+</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>q</mi></munderover><msub><mi>θ</mi><mi>i</mi></msub><mo> </mo><msub><mi>ϵ</mi><mrow><mo>(</mo><mi>t</mi><mo>-</mo><mi>i</mi><mo>)</mo></mrow></msub></mtd></mtr><mtr><mtd><mtext>with </mtext><msub><mi>ϵ</mi><mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow></msub><mo>=</mo><msub><mi>y</mi><mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow></msub><mo>-</mo><msub><mover><mi>y</mi><mo>^</mo></mover><mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow></msub></mtd></mtr></mtable></math>
+</div>
+<p>In this equation:</p>
+<ul>
+<li>
+<p><em>ŷ</em><sub>(<em>t</em>)</sub> is the model’s forecast for time step <em>t</em>.</p>
+</li>
+<li>
+<p><em>y</em><sub>(<em>t</em>)</sub> is the time series’ value at time step <em>t</em>.</p>
+</li>
+<li>
+<p>The first sum is the weighted sum of the past <em>p</em> values of the time series, using the learned weights <em>α</em><sub><em>i</em></sub>. The number <em>p</em> is a hyperparameter, and it determines how far back into the past the model should look. <a data-primary="autoregressive model" data-type="indexterm" id="idm45983088481824"></a>This sum is the <em>autoregressive</em> component of the model: it performs regression based on past values.</p>
+</li>
+<li>
+<p>The second sum is the weighted sum over the past <em>q</em> forecast errors <em>ε</em><sub>(<em>t</em>)</sub>, using the learned weights <em>θ</em><sub><em>i</em></sub>. The number <em>q</em> is a hyperparameter. This sum is the moving average component of the model.</p>
+</li>
+</ul>
+<p>Importantly, this model assumes that the time series is stationary. If it is not, then differencing may help. <a data-primary="differencing, time series forecasting" data-type="indexterm" id="idm45983088476032"></a>Using differencing over a single time step will produce an approximation of the derivative of the time series: indeed, it will give the slope of the series at each time step. This means that it will eliminate any linear trend, transforming it into a constant value. For example, if you apply one-step differencing to the series [3, 5, 7, 9, 11], you get the differenced series [2, 2, 2, 2].</p>
+<p>If the original time series has a quadratic trend instead of a linear trend, then a single round of differencing will not be enough. For example, the series [1, 4, 9, 16, 25, 36] becomes [3, 5, 7, 9, 11] after one round of differencing, but if you run differencing for a second round, then you get [2, 2, 2, 2]. So, running two rounds of differencing will eliminate quadratic trends. <a data-primary="order of integration (d) hyperparameter" data-type="indexterm" id="idm45983088474192"></a>More generally, running <em>d</em> consecutive rounds of differencing computes an approximation of the <em>d</em><sup>th</sup> order derivative of the time series, so it will eliminate polynomial trends up to degree <em>d</em>. This hyperparameter <em>d</em> is called the <em>order of integration</em>.</p>
+<p>Differencing is the central contribution of the <em>autoregressive integrated moving average</em> (ARIMA) model, introduced in 1970 by George Box and Gwilym Jenkins in their book <em>Time Series Analysis</em> (Wiley): this model runs <em>d</em> rounds of differencing to make the time series more stationary, then it applies a regular ARMA model. When making forecasts, it uses this ARMA model, then it adds back the terms that were subtracted by differencing.<a data-primary="ARIMA model" data-type="indexterm" id="ix_arima_model"></a><a data-primary="autoregressive integrated moving average (ARIMA) model" data-type="indexterm" id="ix_autoregress_int_arima"></a></p>
+<p>One last member of the ARMA family is the <em>seasonal ARIMA</em> (SARIMA) model: <a data-primary="SARIMA model" data-type="indexterm" id="ix_sarima_mod"></a>it models the time series in the same way as ARIMA, but it additionally models a seasonal component for a given frequency (e.g., weekly), using the exact same ARIMA approach. It has a total of seven hyperparameters: the same <em>p</em>, <em>d</em>, and <em>q</em> hyperparameters as ARIMA, plus additional <em>P</em>, <em>D</em>, and <em>Q</em> hyperparameters to model the seasonal pattern, and lastly the period of the seasonal pattern, noted <em>s</em>. The hyperparameters <em>P</em>, <em>D</em>, and <em>Q</em> are just like <em>p</em>, <em>d</em>, and <em>q</em>, but they are used to model the time series at <em>t</em> – <em>s</em>, <em>t</em> – 2<em>s</em>, <em>t</em> – 3<em>s</em>, etc.</p>
+<p>Let’s see how to fit a SARIMA model to the rail time series, and use it to make a forecast for tomorrow’s ridership. We’ll pretend today is the last day of May 2019, and we want to forecast the rail ridership for “tomorrow”, the 1st of June, 2019. <a data-primary="statsmodels library" data-type="indexterm" id="idm45983088465872"></a>For this, we can use the <code>statsmodels</code> library, which contains many different statistical models, including the ARMA model and its variants, implemented by the <code>ARIMA</code> class:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">from</code> <code class="nn">statsmodels.tsa.arima.model</code> <code class="kn">import</code> <code class="n">ARIMA</code>
+
+<code class="n">origin</code><code class="p">,</code> <code class="n">today</code> <code class="o">=</code> <code class="s2">"2019-01-01"</code><code class="p">,</code> <code class="s2">"2019-05-31"</code>
+<code class="n">rail_series</code> <code class="o">=</code> <code class="n">df</code><code class="o">.</code><code class="n">loc</code><code class="p">[</code><code class="n">origin</code><code class="p">:</code><code class="n">today</code><code class="p">][</code><code class="s2">"rail"</code><code class="p">]</code><code class="o">.</code><code class="n">asfreq</code><code class="p">(</code><code class="s2">"D"</code><code class="p">)</code>
+<code class="n">model</code> <code class="o">=</code> <code class="n">ARIMA</code><code class="p">(</code><code class="n">rail_series</code><code class="p">,</code>
+              <code class="n">order</code><code class="o">=</code><code class="p">(</code><code class="mi">1</code><code class="p">,</code> <code class="mi">0</code><code class="p">,</code> <code class="mi">0</code><code class="p">),</code>
+              <code class="n">seasonal_order</code><code class="o">=</code><code class="p">(</code><code class="mi">0</code><code class="p">,</code> <code class="mi">1</code><code class="p">,</code> <code class="mi">1</code><code class="p">,</code> <code class="mi">7</code><code class="p">))</code>
+<code class="n">model</code> <code class="o">=</code> <code class="n">model</code><code class="o">.</code><code class="n">fit</code><code class="p">()</code>
+<code class="n">y_pred</code> <code class="o">=</code> <code class="n">model</code><code class="o">.</code><code class="n">forecast</code><code class="p">()</code>  <code class="c1"># returns 427,758.6</code></pre>
+<p>In this code example:</p>
+<ul>
+<li>
+<p>We start by importing the <code>ARIMA</code> class, then we take the rail ridership data from the start of 2019 up to “today”, and we use <code>asfreq("D")</code> to set the time series’ frequency to daily: this doesn’t change the data at all in this case, since it’s already daily, but without this the <code>ARIMA</code> class would have to guess the frequency, and it would display a warning.</p>
+</li>
+<li>
+<p>Next, we create an <code>ARIMA</code> instance, passing it all the data until “today”, and we set the model hyperparameters: <code>order=(1, 0, 0)</code> means that <em>p</em> = 1, <em>d</em> = 0, <em>q</em> = 0, and <code>seasonal_order=(0, 1, 1, 7)</code> means that <em>P</em> = 0, <em>D</em> = 1, <em>Q</em> = 1, and <em>s</em> = 7. Notice that the <code>statsmodels</code> API differs a bit from Scikit-Learn’s API, since we pass the data to the model at construction time, instead of passing it to the <code>fit()</code> method.</p>
+</li>
+<li>
+<p>Next, we fit the model, and we use it to make a forecast for “tomorrow”, the 1st of June, 2019.</p>
+</li>
+</ul>
+<p>The forecast is 427,759 passengers, when in fact there were 379,044. Yikes, we’re 12.9% off—that’s pretty bad. It’s actually slightly worse than naive forecasting, which forecasts 426,932, off by 12.6%. But perhaps we were just unlucky that day? To check this, we can run the same code in a loop to make forecasts for every day in March, April, and May, and compute the MAE over that period:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">origin</code><code class="p">,</code> <code class="n">start_date</code><code class="p">,</code> <code class="n">end_date</code> <code class="o">=</code> <code class="s2">"2019-01-01"</code><code class="p">,</code> <code class="s2">"2019-03-01"</code><code class="p">,</code> <code class="s2">"2019-05-31"</code>
+<code class="n">time_period</code> <code class="o">=</code> <code class="n">pd</code><code class="o">.</code><code class="n">date_range</code><code class="p">(</code><code class="n">start_date</code><code class="p">,</code> <code class="n">end_date</code><code class="p">)</code>
+<code class="n">rail_series</code> <code class="o">=</code> <code class="n">df</code><code class="o">.</code><code class="n">loc</code><code class="p">[</code><code class="n">origin</code><code class="p">:</code><code class="n">end_date</code><code class="p">][</code><code class="s2">"rail"</code><code class="p">]</code><code class="o">.</code><code class="n">asfreq</code><code class="p">(</code><code class="s2">"D"</code><code class="p">)</code>
+<code class="n">y_preds</code> <code class="o">=</code> <code class="p">[]</code>
+<code class="k">for</code> <code class="n">today</code> <code class="ow">in</code> <code class="n">time_period</code><code class="o">.</code><code class="n">shift</code><code class="p">(</code><code class="o">-</code><code class="mi">1</code><code class="p">):</code>
+    <code class="n">model</code> <code class="o">=</code> <code class="n">ARIMA</code><code class="p">(</code><code class="n">rail_series</code><code class="p">[</code><code class="n">origin</code><code class="p">:</code><code class="n">today</code><code class="p">],</code>  <code class="c1"># train on data up to "today"</code>
+                  <code class="n">order</code><code class="o">=</code><code class="p">(</code><code class="mi">1</code><code class="p">,</code> <code class="mi">0</code><code class="p">,</code> <code class="mi">0</code><code class="p">),</code>
+                  <code class="n">seasonal_order</code><code class="o">=</code><code class="p">(</code><code class="mi">0</code><code class="p">,</code> <code class="mi">1</code><code class="p">,</code> <code class="mi">1</code><code class="p">,</code> <code class="mi">7</code><code class="p">))</code>
+    <code class="n">model</code> <code class="o">=</code> <code class="n">model</code><code class="o">.</code><code class="n">fit</code><code class="p">()</code>  <code class="c1"># note that we retrain the model every day!</code>
+    <code class="n">y_pred</code> <code class="o">=</code> <code class="n">model</code><code class="o">.</code><code class="n">forecast</code><code class="p">()[</code><code class="mi">0</code><code class="p">]</code>
+    <code class="n">y_preds</code><code class="o">.</code><code class="n">append</code><code class="p">(</code><code class="n">y_pred</code><code class="p">)</code>
+
+<code class="n">y_preds</code> <code class="o">=</code> <code class="n">pd</code><code class="o">.</code><code class="n">Series</code><code class="p">(</code><code class="n">y_preds</code><code class="p">,</code> <code class="n">index</code><code class="o">=</code><code class="n">time_period</code><code class="p">)</code>
+<code class="n">mae</code> <code class="o">=</code> <code class="p">(</code><code class="n">y_preds</code> <code class="o">-</code> <code class="n">rail_series</code><code class="p">[</code><code class="n">time_period</code><code class="p">])</code><code class="o">.</code><code class="n">abs</code><code class="p">()</code><code class="o">.</code><code class="n">mean</code><code class="p">()</code>  <code class="c1"># returns 32,040.7</code></pre>
+<p>Ah, that’s much better! The MAE is about 32,041, which is significantly lower than the MAE we got with naive forecasting (42,143). So although the model is not perfect, it still beats naive forecasting by a large margin, on average.</p>
+<p>At this point, you may be wondering how to pick good hyperparameters for the SARIMA model. There are several methods, but the simplest to understand and to get started with is the brute-force approach: just run a grid search. For each model you want to evaluate (i.e., each hyperparameter combination), you can run the preceding code example, changing only the hyperparameter values. Good <em>p</em>, <em>q</em>, <em>P</em>, and <em>Q</em> values are usually fairly small (typically 0 to 2, sometimes up to 5 or 6), and <em>d</em> and <em>D</em> are typically 0 or 1, sometimes 2. As for <em>s</em>, it’s just the main seasonal pattern’s period: in our case it’s 7 since there’s a strong weekly seasonality. The model with the lowest MAE wins. Of course, you can replace the MAE with another metric if it better matches your business objective.<a data-primary="" data-startref="ix_time_series_arma" data-type="indexterm" id="idm45983088142992"></a><a data-primary="" data-startref="ix_arma_fam_time_series" data-type="indexterm" id="idm45983088142016"></a><a data-primary="" data-startref="ix_autoregress_arma" data-type="indexterm" id="idm45983088141072"></a><a data-primary="" data-startref="ix_sarima_mod" data-type="indexterm" id="idm45983088140128"></a><a data-primary="" data-startref="ix_arima_model" data-type="indexterm" id="idm45983088139184"></a><a data-primary="" data-startref="ix_autoregress_int_arima" data-type="indexterm" id="idm45983088138240"></a> And that’s it!<sup><a data-type="noteref" href="#idm45983088137200" id="idm45983088137200-marker">4</a></sup></p>
+</div>
+</section>
+<section data-pdf-bookmark="Preparing the Data for Machine Learning Models" data-type="sect2"><div class="sect2" id="idm45983088261456">
+<h2 id="sigil_toc_id_297" class="sigil_not_in_toc">Preparing the Data for Machine Learning Models</h2>
+<p>Now that we have two baselines, naive forecasting and SARIMA, let’s try to use the machine learning models we’ve covered so far to forecast this time series, starting with a basic linear model. <a data-primary="time series data, forecasting" data-secondary="data preparation for ML models" data-type="indexterm" id="ix_time_series_data_prep"></a><a data-primary="data" data-secondary="preparing for ML models" data-type="indexterm" id="ix_data_time_series"></a>Our goal will be to forecast tomorrow’s ridership based on the ridership of the past 8 weeks of data (56 days). The inputs to our model will therefore be sequences (usually a single sequence per day once the model is in production), each containing 56 values from time steps <em>t</em> – 55 to <em>t</em>. For each input sequence, the model will output a single value: the forecast for time step <em>t</em> + 1.</p>
+<p>But what will we use as training data? Well, that’s the trick: we will use every 56-day window from the past as training data, and the target for each window will be the value immediately following it.</p>
+<p>Keras actually has a nice utility function called <code>tf.keras.utils.timeseries_​data⁠set_from_array()</code> to help us prepare the training set. <a data-primary="Keras API" data-secondary="tf.keras.utils.timeseries_dataset_from_array()" data-type="indexterm" id="idm45983088124592"></a>It takes a time series as input, and it builds a tf.data.Dataset (introduced in <a data-type="xref" href="HOMLWSKT018.xhtml#data_chapter">Chapter 13</a>) containing all the windows of the desired length, as well as their corresponding targets. Here’s an example that takes a time series containing the numbers 0 to 5 and creates a dataset containing all the windows of length 3, with their corresponding targets, grouped into batches of size 2:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">import</code> <code class="nn">tensorflow</code> <code class="k">as</code> <code class="nn">tf</code>
+
+<code class="n">my_series</code> <code class="o">=</code> <code class="p">[</code><code class="mi">0</code><code class="p">,</code> <code class="mi">1</code><code class="p">,</code> <code class="mi">2</code><code class="p">,</code> <code class="mi">3</code><code class="p">,</code> <code class="mi">4</code><code class="p">,</code> <code class="mi">5</code><code class="p">]</code>
+<code class="n">my_dataset</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">utils</code><code class="o">.</code><code class="n">timeseries_dataset_from_array</code><code class="p">(</code>
+    <code class="n">my_series</code><code class="p">,</code>
+    <code class="n">targets</code><code class="o">=</code><code class="n">my_series</code><code class="p">[</code><code class="mi">3</code><code class="p">:],</code>  <code class="c1"># the targets are 3 steps into the future</code>
+    <code class="n">sequence_length</code><code class="o">=</code><code class="mi">3</code><code class="p">,</code>
+    <code class="n">batch_size</code><code class="o">=</code><code class="mi">2</code>
+<code class="p">)</code></pre>
+<p>Let’s inspect the contents of this dataset:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="nb">list</code><code class="p">(</code><code class="n">my_dataset</code><code class="p">)</code>
+<code class="go">[(&lt;tf.Tensor: shape=(2, 3), dtype=int32, numpy=</code>
+<code class="go">  array([[0, 1, 2],</code>
+<code class="go">         [1, 2, 3]], dtype=int32)&gt;,</code>
+<code class="go">  &lt;tf.Tensor: shape=(2,), dtype=int32, numpy=array([3, 4], dtype=int32)&gt;),</code>
+<code class="go"> (&lt;tf.Tensor: shape=(1, 3), dtype=int32, numpy=array([[2, 3, 4]], dtype=int32)&gt;,</code>
+<code class="go">  &lt;tf.Tensor: shape=(1,), dtype=int32, numpy=array([5], dtype=int32)&gt;)]</code></pre>
+<p>Each sample in the dataset is a window of length 3, along with its corresponding target (i.e., the value immediately after the window). The windows are [0, 1, 2], [1, 2, 3], and [2, 3, 4], and their respective targets are 3, 4, and 5. Since there are three windows in total, which is not a multiple of the batch size, the last batch only contains one window instead of two.</p>
+<p>Another way to get the same result is to use the <code>window()</code> method of tf.data’s <code>Dataset</code> class. It’s more complex, but it gives you full control, which will come in handy later in this chapter, so let’s see how it works. The <code>window()</code> method returns a dataset of window datasets:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="k">for</code> <code class="n">window_dataset</code> <code class="ow">in</code> <code class="n">tf</code><code class="o">.</code><code class="n">data</code><code class="o">.</code><code class="n">Dataset</code><code class="o">.</code><code class="n">range</code><code class="p">(</code><code class="mi">6</code><code class="p">)</code><code class="o">.</code><code class="n">window</code><code class="p">(</code><code class="mi">4</code><code class="p">,</code> <code class="n">shift</code><code class="o">=</code><code class="mi">1</code><code class="p">):</code>
+<code class="gp">... </code>    <code class="k">for</code> <code class="n">element</code> <code class="ow">in</code> <code class="n">window_dataset</code><code class="p">:</code>
+<code class="gp">... </code>        <code class="nb">print</code><code class="p">(</code><code class="sa">f</code><code class="s2">"</code><code class="si">{</code><code class="n">element</code><code class="si">}</code><code class="s2">"</code><code class="p">,</code> <code class="n">end</code><code class="o">=</code><code class="s2">" "</code><code class="p">)</code>
+<code class="gp">... </code>    <code class="nb">print</code><code class="p">()</code>
+<code class="gp">...</code>
+<code class="go">0 1 2 3</code>
+<code class="go">1 2 3 4</code>
+<code class="go">2 3 4 5</code>
+<code class="go">3 4 5</code>
+<code class="go">4 5</code>
+<code class="go">5</code></pre>
+<p>In this example, the dataset contains six windows, each shifted by one step compared to the previous one, and the last three windows are smaller because they’ve reached the end of the series. In general you’ll want to get rid of these smaller windows by passing <code>drop_remainder=True</code> to the <code>window()</code> method.</p>
+<p>The <code>window()</code> method returns a <em>nested dataset</em>, analogous to a list of lists. <a data-primary="nested dataset" data-type="indexterm" id="idm45983087959488"></a>This is useful when you want to transform each window by calling its dataset methods (e.g., to shuffle them or batch them). However, we cannot use a nested dataset directly for training, as our model will expect tensors as input, not datasets.</p>
+<p>Therefore, we must call the <code>flat_map()</code> method: <a data-primary="flat dataset" data-type="indexterm" id="idm45983087957856"></a>it converts a nested dataset into a <em>flat dataset</em> (one that contains tensors, not datasets). For example, suppose {1, 2, 3} represents a dataset containing the sequence of tensors 1, 2, and 3. If you flatten the nested dataset {{1, 2}, {3, 4, 5, 6}}, you get back the flat dataset {1, 2, 3, 4, 5, 6}.</p>
+<p>Moreover, the <code>flat_map()</code> method takes a function as an argument, which allows you to transform each dataset in the nested dataset before flattening. For example, if you pass the function <code>lambda ds: ds.batch(2)</code> to <code>flat_map()</code>, then it will transform the nested dataset {{1, 2}, {3, 4, 5, 6}} into the flat dataset {[1, 2], [3, 4], [5, 6]}: it’s a dataset containing 3 tensors, each of size 2.</p>
+<p>With that in mind, we are ready to flatten our dataset:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">dataset</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">data</code><code class="o">.</code><code class="n">Dataset</code><code class="o">.</code><code class="n">range</code><code class="p">(</code><code class="mi">6</code><code class="p">)</code><code class="o">.</code><code class="n">window</code><code class="p">(</code><code class="mi">4</code><code class="p">,</code> <code class="n">shift</code><code class="o">=</code><code class="mi">1</code><code class="p">,</code> <code class="n">drop_remainder</code><code class="o">=</code><code class="kc">True</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">dataset</code> <code class="o">=</code> <code class="n">dataset</code><code class="o">.</code><code class="n">flat_map</code><code class="p">(</code><code class="k">lambda</code> <code class="n">window_dataset</code><code class="p">:</code> <code class="n">window_dataset</code><code class="o">.</code><code class="n">batch</code><code class="p">(</code><code class="mi">4</code><code class="p">))</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="k">for</code> <code class="n">window_tensor</code> <code class="ow">in</code> <code class="n">dataset</code><code class="p">:</code>
+<code class="gp">... </code>    <code class="nb">print</code><code class="p">(</code><code class="sa">f</code><code class="s2">"</code><code class="si">{</code><code class="n">window_tensor</code><code class="si">}</code><code class="s2">"</code><code class="p">)</code>
+<code class="gp">...</code>
+<code class="go">[0 1 2 3]</code>
+<code class="go">[1 2 3 4]</code>
+<code class="go">[2 3 4 5]</code></pre>
+<p>Since each window dataset contains exactly four items, calling <code>batch(4)</code> on a window produces a single tensor of size 4. Great! We now have a dataset containing consecutive windows represented as tensors. Let’s create a little helper function to make it easier to extract windows from a dataset:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="k">def</code> <code class="nf">to_windows</code><code class="p">(</code><code class="n">dataset</code><code class="p">,</code> <code class="n">length</code><code class="p">):</code>
+    <code class="n">dataset</code> <code class="o">=</code> <code class="n">dataset</code><code class="o">.</code><code class="n">window</code><code class="p">(</code><code class="n">length</code><code class="p">,</code> <code class="n">shift</code><code class="o">=</code><code class="mi">1</code><code class="p">,</code> <code class="n">drop_remainder</code><code class="o">=</code><code class="kc">True</code><code class="p">)</code>
+    <code class="k">return</code> <code class="n">dataset</code><code class="o">.</code><code class="n">flat_map</code><code class="p">(</code><code class="k">lambda</code> <code class="n">window_ds</code><code class="p">:</code> <code class="n">window_ds</code><code class="o">.</code><code class="n">batch</code><code class="p">(</code><code class="n">length</code><code class="p">))</code></pre>
+<p>The last step is to split each window into inputs and targets, using the <code>map()</code> method. We can also group the resulting windows into batches of size 2:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">dataset</code> <code class="o">=</code> <code class="n">to_windows</code><code class="p">(</code><code class="n">tf</code><code class="o">.</code><code class="n">data</code><code class="o">.</code><code class="n">Dataset</code><code class="o">.</code><code class="n">range</code><code class="p">(</code><code class="mi">6</code><code class="p">),</code> <code class="mi">4</code><code class="p">)</code>  <code class="c1"># 3 inputs + 1 target = 4</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">dataset</code> <code class="o">=</code> <code class="n">dataset</code><code class="o">.</code><code class="n">map</code><code class="p">(</code><code class="k">lambda</code> <code class="n">window</code><code class="p">:</code> <code class="p">(</code><code class="n">window</code><code class="p">[:</code><code class="o">-</code><code class="mi">1</code><code class="p">],</code> <code class="n">window</code><code class="p">[</code><code class="o">-</code><code class="mi">1</code><code class="p">]))</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="nb">list</code><code class="p">(</code><code class="n">dataset</code><code class="o">.</code><code class="n">batch</code><code class="p">(</code><code class="mi">2</code><code class="p">))</code>
+<code class="go">[(&lt;tf.Tensor: shape=(2, 3), dtype=int64, numpy=</code>
+<code class="go">  array([[0, 1, 2],</code>
+<code class="go">         [1, 2, 3]])&gt;,</code>
+<code class="go">  &lt;tf.Tensor: shape=(2,), dtype=int64, numpy=array([3, 4])&gt;),</code>
+<code class="go"> (&lt;tf.Tensor: shape=(1, 3), dtype=int64, numpy=array([[2, 3, 4]])&gt;,</code>
+<code class="go">  &lt;tf.Tensor: shape=(1,), dtype=int64, numpy=array([5])&gt;)]</code></pre>
+<p>As you can see, we now have the same output as we got earlier with the 
+<span class="keep-together"><code>timeseries_dataset_from_array()</code></span> function (with a bit more effort, but it will be worthwhile soon).</p>
+<p>Now, before we start training, we need to split our data into a training period, a validation period, and a test period. We will focus on the rail ridership for now. We will also scale it down by a factor of one million, to ensure the values are near the 0–1 range; this plays nicely with the default weight initialization and learning rate:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">rail_train</code> <code class="o">=</code> <code class="n">df</code><code class="p">[</code><code class="s2">"rail"</code><code class="p">][</code><code class="s2">"2016-01"</code><code class="p">:</code><code class="s2">"2018-12"</code><code class="p">]</code> <code class="o">/</code> <code class="mf">1e6</code>
+<code class="n">rail_valid</code> <code class="o">=</code> <code class="n">df</code><code class="p">[</code><code class="s2">"rail"</code><code class="p">][</code><code class="s2">"2019-01"</code><code class="p">:</code><code class="s2">"2019-05"</code><code class="p">]</code> <code class="o">/</code> <code class="mf">1e6</code>
+<code class="n">rail_test</code> <code class="o">=</code> <code class="n">df</code><code class="p">[</code><code class="s2">"rail"</code><code class="p">][</code><code class="s2">"2019-06"</code><code class="p">:]</code> <code class="o">/</code> <code class="mf">1e6</code></pre>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>When dealing with time series, you generally want to split across time. However, in some cases you may be able to split along other dimensions, which will give you a longer time period to train on. For example, if you have data about the financial health of 10,000 companies from 2001 to 2019, you might be able to split this data across the different companies. It’s very likely that many of these companies will be strongly correlated, though (e.g., whole economic sectors may go up or down jointly), and if you have correlated companies across the training set and the test set, your test set will not be as useful, as its measure of the generalization error will be optimistically biased.</p>
+</div>
+<p class="pagebreak-before">Next, let’s use <code>timeseries_dataset_from_array()</code> to create datasets for training and validation. <a data-primary="Keras API" data-secondary="tf.keras.utils.timeseries_dataset_from_array()" data-type="indexterm" id="idm45983087639744"></a>Since gradient descent expects the instances in the training set to be independent and identically distributed (IID), as we saw in <a data-type="xref" href="HOMLWSKT008.xhtml#linear_models_chapter">Chapter 4</a>, we must set the argument <code>shuffle=True</code> to shuffle the training windows (but not their contents):</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">seq_length</code> <code class="o">=</code> <code class="mi">56</code>
+<code class="n">train_ds</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">utils</code><code class="o">.</code><code class="n">timeseries_dataset_from_array</code><code class="p">(</code>
+    <code class="n">rail_train</code><code class="o">.</code><code class="n">to_numpy</code><code class="p">(),</code>
+    <code class="n">targets</code><code class="o">=</code><code class="n">rail_train</code><code class="p">[</code><code class="n">seq_length</code><code class="p">:],</code>
+    <code class="n">sequence_length</code><code class="o">=</code><code class="n">seq_length</code><code class="p">,</code>
+    <code class="n">batch_size</code><code class="o">=</code><code class="mi">32</code><code class="p">,</code>
+    <code class="n">shuffle</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code>
+    <code class="n">seed</code><code class="o">=</code><code class="mi">42</code>
+<code class="p">)</code>
+<code class="n">valid_ds</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">utils</code><code class="o">.</code><code class="n">timeseries_dataset_from_array</code><code class="p">(</code>
+    <code class="n">rail_valid</code><code class="o">.</code><code class="n">to_numpy</code><code class="p">(),</code>
+    <code class="n">targets</code><code class="o">=</code><code class="n">rail_valid</code><code class="p">[</code><code class="n">seq_length</code><code class="p">:],</code>
+    <code class="n">sequence_length</code><code class="o">=</code><code class="n">seq_length</code><code class="p">,</code>
+    <code class="n">batch_size</code><code class="o">=</code><code class="mi">32</code>
+<code class="p">)</code></pre>
+<p>And now we’re ready to build and train any regression model we want!<a data-primary="" data-startref="ix_time_series_data_prep" data-type="indexterm" id="idm45983087538976"></a><a data-primary="" data-startref="ix_data_time_series" data-type="indexterm" id="idm45983087538128"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Forecasting Using a Linear Model" data-type="sect2"><div class="sect2" id="idm45983088130624">
+<h2 id="sigil_toc_id_298" class="sigil_not_in_toc">Forecasting Using a Linear Model</h2>
+<p>Let’s try a basic linear model first. <a data-primary="time series data, forecasting" data-secondary="with linear model" data-secondary-sortas="linear model" data-type="indexterm" id="idm45983087489136"></a><a data-primary="linear models" data-secondary="forecasting time series" data-type="indexterm" id="idm45983087487920"></a><a data-primary="Huber loss" data-type="indexterm" id="idm45983087486976"></a>We will use the Huber loss, which usually works better than minimizing the MAE directly, as discussed in <a data-type="xref" href="HOMLWSKT015.xhtml#ann_chapter">Chapter 10</a>. <a data-primary="early stopping regularization" data-type="indexterm" id="idm45983087485248"></a><a data-primary="regularization" data-secondary="early stopping" data-type="indexterm" id="idm45983087484576"></a>We’ll also use early stopping:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">tf</code><code class="o">.</code><code class="n">random</code><code class="o">.</code><code class="n">set_seed</code><code class="p">(</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">([</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Dense</code><code class="p">(</code><code class="mi">1</code><code class="p">,</code> <code class="n">input_shape</code><code class="o">=</code><code class="p">[</code><code class="n">seq_length</code><code class="p">])</code>
+<code class="p">])</code>
+<code class="n">early_stopping_cb</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">callbacks</code><code class="o">.</code><code class="n">EarlyStopping</code><code class="p">(</code>
+    <code class="n">monitor</code><code class="o">=</code><code class="s2">"val_mae"</code><code class="p">,</code> <code class="n">patience</code><code class="o">=</code><code class="mi">50</code><code class="p">,</code> <code class="n">restore_best_weights</code><code class="o">=</code><code class="kc">True</code><code class="p">)</code>
+<code class="n">opt</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">optimizers</code><code class="o">.</code><code class="n">SGD</code><code class="p">(</code><code class="n">learning_rate</code><code class="o">=</code><code class="mf">0.02</code><code class="p">,</code> <code class="n">momentum</code><code class="o">=</code><code class="mf">0.9</code><code class="p">)</code>
+<code class="n">model</code><code class="o">.</code><code class="n">compile</code><code class="p">(</code><code class="n">loss</code><code class="o">=</code><code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">losses</code><code class="o">.</code><code class="n">Huber</code><code class="p">(),</code> <code class="n">optimizer</code><code class="o">=</code><code class="n">opt</code><code class="p">,</code> <code class="n">metrics</code><code class="o">=</code><code class="p">[</code><code class="s2">"mae"</code><code class="p">])</code>
+<code class="n">history</code> <code class="o">=</code> <code class="n">model</code><code class="o">.</code><code class="n">fit</code><code class="p">(</code><code class="n">train_ds</code><code class="p">,</code> <code class="n">validation_data</code><code class="o">=</code><code class="n">valid_ds</code><code class="p">,</code> <code class="n">epochs</code><code class="o">=</code><code class="mi">500</code><code class="p">,</code>
+                    <code class="n">callbacks</code><code class="o">=</code><code class="p">[</code><code class="n">early_stopping_cb</code><code class="p">])</code></pre>
+<p>This model reaches a validation MAE of about 37,866 (your mileage may vary). That’s better than naive forecasting, but worse than the SARIMA model.<sup><a data-type="noteref" href="#idm45983087404768" id="idm45983087404768-marker">5</a></sup></p>
+<p>Can we do better with an RNN? Let’s see!</p>
+</div>
+</section>
+<section data-pdf-bookmark="Forecasting Using a Simple RNN" data-type="sect2"><div class="sect2" id="idm45983087373744">
+<h2 id="sigil_toc_id_299" class="sigil_not_in_toc">Forecasting Using a Simple RNN</h2>
+<p>Let’s try the most basic RNN, containing a single recurrent layer with just one recurrent neuron, as we saw in <a data-type="xref" href="#simple_rnn_diagram">Figure 15-1</a>:<a data-primary="time series data, forecasting" data-secondary="with simple RNN" data-secondary-sortas="simple RNN" data-type="indexterm" id="ix_time_series_sRNN"></a><a data-primary="Keras API" data-secondary="time series forecasting for RNN" data-type="indexterm" id="ix_keras_time_rnn"></a></p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">([</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">SimpleRNN</code><code class="p">(</code><code class="mi">1</code><code class="p">,</code> <code class="n">input_shape</code><code class="o">=</code><code class="p">[</code><code class="kc">None</code><code class="p">,</code> <code class="mi">1</code><code class="p">])</code>
+<code class="p">])</code></pre>
+<p>All recurrent layers in Keras expect 3D inputs of shape [<em>batch size</em>, <em>time steps</em>, <em>dimensionality</em>], where <em>dimensionality</em> is 1 for univariate time series and more for multivariate time series. Recall that the <code>input_shape</code> argument ignores the first dimension (i.e., the batch size), and since recurrent layers can accept input sequences of any length, we can set the second dimension to <code>None</code>, which means “any size”. Lastly, since we’re dealing with a univariate time series, we need the last dimension’s size to be 1. This is why we specified the input shape <code>[None, 1]</code>: it means “univariate sequences of any length”. Note that the datasets actually contain inputs of shape [<em>batch size</em>, <em>time steps</em>], so we’re missing the last dimension, of size 1, but Keras is kind enough to add it for us in this case.</p>
+<p>This model works exactly as we saw earlier: the initial state <em>h</em><sub>(init)</sub> is set to 0, and it is passed to a single recurrent neuron, along with the value of the first time step, <em>x</em><sub>(0)</sub>. The neuron computes a weighted sum of these values plus the bias term, and it applies the activation function to the result, using the hyperbolic tangent function by default. The result is the first output, <em>y</em><sub>0</sub>. In a simple RNN, this output is also the new state <em>h</em><sub>0</sub>. This new state is passed to the same recurrent neuron along with the next input value, <em>x</em><sub>(1)</sub>, and the process is repeated until the last time step. At the end, the layer just outputs the last value: in our case the sequences are 56 steps long, so the last value is <em>y</em><sub>55</sub>. All of this is performed simultaneously for every sequence in the batch, of which there are 32 in this case.</p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>By default, recurrent layers in Keras only return the final output. To make them return one output per time step, you must set <code>return_sequences=True</code>, as you will see.</p>
+</div>
+<p>So that’s our first recurrent model! It’s a sequence-to-vector model. Since there’s a single output neuron, the output vector has a size of 1.</p>
+<p>Now if you compile, train, and evaluate this model just like the previous model, you will find that it’s no good at all: its validation MAE is greater than 100,000! Ouch. That was to be expected, for two reasons:</p>
+<ol class="less_space pagebreak-before">
+<li>
+<p>The model only has a single recurrent neuron, so the only data it can use to make a prediction at each time step is the input value at the current time step and the output value from the previous time step. That’s not much to go on! In other words, the RNN’s memory is extremely limited: it’s just a single number, its previous output. And let’s count how many parameters this model has: since there’s just one recurrent neuron with only two input values, the whole model only has three parameters (two weights plus a bias term). That’s far from enough for this time series. In contrast, our previous model could look at all 56 previous values at once, and it had a total of 57 parameters.</p>
+</li>
+<li>
+<p>The time series contains values from 0 to about 1.4, but since the default activation function is tanh, the recurrent layer can only output values between –1 and +1. There’s no way it can predict values between 1.0 and 1.4.</p>
+</li>
+</ol>
+<p>Let’s fix both of these issues: we will create a model with a larger recurrent layer, containing 32 recurrent neurons, and we will add a dense output layer on top of it with a single output neuron and no activation function. The recurrent layer will be able to carry much more information from one time step to the next, and the dense output layer will project the final output from 32 dimensions down to 1, without any value range constraints:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">univar_model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">([</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">SimpleRNN</code><code class="p">(</code><code class="mi">32</code><code class="p">,</code> <code class="n">input_shape</code><code class="o">=</code><code class="p">[</code><code class="kc">None</code><code class="p">,</code> <code class="mi">1</code><code class="p">]),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Dense</code><code class="p">(</code><code class="mi">1</code><code class="p">)</code>  <code class="c1"># no activation function by default</code>
+<code class="p">])</code></pre>
+<p>Now if you compile, fit, and evaluate this model just like the previous one, you will find that its validation MAE reaches 27,703. That’s the best model we’ve trained so far, and it even beats the SARIMA model: we’re doing pretty well!</p>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>We’ve only normalized the time series, without removing trend and seasonality, and yet the model still performs well. This is convenient, as it makes it possible to quickly search for promising models without worrying too much about preprocessing. However, to get the best performance, you may want to try making the time series more stationary; for example, using differencing.<a data-primary="" data-startref="ix_time_series_sRNN" data-type="indexterm" id="idm45983087191552"></a></p>
+</div>
+</div>
+</section>
+<section data-pdf-bookmark="Forecasting Using a Deep RNN" data-type="sect2"><div class="sect2" id="idm45983087373152">
+<h2 id="sigil_toc_id_300" class="sigil_not_in_toc">Forecasting Using a Deep RNN</h2>
+<p>It is quite common to stack multiple layers of cells, as shown in <a data-type="xref" href="#deep_rnn_diagram">Figure 15-10</a>. <a data-primary="recurrent neural networks (RNNs)" data-secondary="deep RNN" data-type="indexterm" id="idm45983087175072"></a><a data-primary="time series data, forecasting" data-secondary="with deep RNN" data-secondary-sortas="deep RNN" data-type="indexterm" id="idm45983087174128"></a>This gives you a <em>deep RNN</em>.</p>
+<figure class="smallerseventy"><div class="figure" id="deep_rnn_diagram">
+<img alt="mls3 1510" height="352" src="../Images/mls3_1510.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-10. </span>A deep RNN (left) unrolled through time (right)</h6>
+</div>
+</figure>
+<p>Implementing a deep RNN with Keras is straightforward: just stack recurrent layers. In the following example, we use three <code>SimpleRNN</code> layers (but we could use any other type of recurrent layer instead, such as an <code>LSTM</code> layer or a <code>GRU</code> layer, which we will discuss shortly). The first two are sequence-to-sequence layers, and the last one is a sequence-to-vector layer. Finally, the <code>Dense</code> layer produces the model’s forecast (you can think of it as a vector-to-vector layer). So this model is just like the model represented in <a data-type="xref" href="#deep_rnn_diagram">Figure 15-10</a>, except the outputs <strong>Ŷ</strong><sub>(0)</sub> to <strong>Ŷ</strong><sub>(<em>t</em>–1_)</sub> are ignored, and there’s a dense layer on top of <strong>Ŷ</strong><sub>(<em>t</em>)</sub>, which outputs the actual forecast:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">deep_model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">([</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">SimpleRNN</code><code class="p">(</code><code class="mi">32</code><code class="p">,</code> <code class="n">return_sequences</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">input_shape</code><code class="o">=</code><code class="p">[</code><code class="kc">None</code><code class="p">,</code> <code class="mi">1</code><code class="p">]),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">SimpleRNN</code><code class="p">(</code><code class="mi">32</code><code class="p">,</code> <code class="n">return_sequences</code><code class="o">=</code><code class="kc">True</code><code class="p">),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">SimpleRNN</code><code class="p">(</code><code class="mi">32</code><code class="p">),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Dense</code><code class="p">(</code><code class="mi">1</code><code class="p">)</code>
+<code class="p">])</code></pre>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>Make sure to set <code>return_sequences=True</code> for all recurrent layers (except the last one, if you only care about the last output). If you forget to set this parameter for one recurrent layer, it will output a 2D array containing only the output of the last time step, instead of a 3D array containing outputs for all time steps. The next recurrent layer will complain that you are not feeding it sequences in the expected 3D format.</p>
+</div>
+<p>If you train and evaluate this model, you will find that it reaches an MAE of about 31,211. That’s better than both baselines, but it doesn’t beat our “shallower” RNN. It looks like this RNN is a bit too large for our task.<a data-primary="" data-startref="ix_keras_time_rnn" data-type="indexterm" id="idm45983087132928"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Forecasting Multivariate Time Series" data-type="sect2"><div class="sect2" id="idm45983087131824">
+<h2 id="sigil_toc_id_301" class="sigil_not_in_toc">Forecasting Multivariate Time Series</h2>
+<p>A great quality of neural networks is their flexibility: in particular, they can deal with multivariate time series with almost no change to their architecture. <a data-primary="multivariate time series" data-type="indexterm" id="ix_multivariate_time"></a><a data-primary="time series data, forecasting" data-secondary="multivariate time series" data-type="indexterm" id="ix_time_series_multivariate"></a>For example, let’s try to forecast the rail time series using both the bus and rail data as input. In fact, let’s also throw in the day type! Since we can always know in advance whether tomorrow is going to be a weekday, a weekend, or a holiday, we can shift the day type series one day into the future, so that the model is given tomorrow’s day type as input. For simplicity, we’ll do this processing using Pandas:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">df_mulvar</code> <code class="o">=</code> <code class="n">df</code><code class="p">[[</code><code class="s2">"bus"</code><code class="p">,</code> <code class="s2">"rail"</code><code class="p">]]</code> <code class="o">/</code> <code class="mf">1e6</code>  <code class="c1"># use both bus &amp; rail series as input</code>
+<code class="n">df_mulvar</code><code class="p">[</code><code class="s2">"next_day_type"</code><code class="p">]</code> <code class="o">=</code> <code class="n">df</code><code class="p">[</code><code class="s2">"day_type"</code><code class="p">]</code><code class="o">.</code><code class="n">shift</code><code class="p">(</code><code class="o">-</code><code class="mi">1</code><code class="p">)</code>  <code class="c1"># we know tomorrow's type</code>
+<code class="n">df_mulvar</code> <code class="o">=</code> <code class="n">pd</code><code class="o">.</code><code class="n">get_dummies</code><code class="p">(</code><code class="n">df_mulvar</code><code class="p">)</code>  <code class="c1"># one-hot encode the day type</code></pre>
+<p>Now <code>df_mulvar</code> is a DataFrame with five columns: the bus and rail data, plus three columns containing the one-hot encoding of the next day’s type (recall that there are three possible day types, <code>W</code>, <code>A</code>, and <code>U</code>). Next we can proceed much like we did earlier. First we split the data into three periods, for training, validation, and testing:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">mulvar_train</code> <code class="o">=</code> <code class="n">df_mulvar</code><code class="p">[</code><code class="s2">"2016-01"</code><code class="p">:</code><code class="s2">"2018-12"</code><code class="p">]</code>
+<code class="n">mulvar_valid</code> <code class="o">=</code> <code class="n">df_mulvar</code><code class="p">[</code><code class="s2">"2019-01"</code><code class="p">:</code><code class="s2">"2019-05"</code><code class="p">]</code>
+<code class="n">mulvar_test</code> <code class="o">=</code> <code class="n">df_mulvar</code><code class="p">[</code><code class="s2">"2019-06"</code><code class="p">:]</code></pre>
+<p>Then we create the datasets:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">train_mulvar_ds</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">utils</code><code class="o">.</code><code class="n">timeseries_dataset_from_array</code><code class="p">(</code>
+    <code class="n">mulvar_train</code><code class="o">.</code><code class="n">to_numpy</code><code class="p">(),</code>  <code class="c1"># use all 5 columns as input</code>
+    <code class="n">targets</code><code class="o">=</code><code class="n">mulvar_train</code><code class="p">[</code><code class="s2">"rail"</code><code class="p">][</code><code class="n">seq_length</code><code class="p">:],</code>  <code class="c1"># forecast only the rail series</code>
+    <code class="p">[</code><code class="o">...</code><code class="p">]</code>  <code class="c1"># the other 4 arguments are the same as earlier</code>
+<code class="p">)</code>
+<code class="n">valid_mulvar_ds</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">utils</code><code class="o">.</code><code class="n">timeseries_dataset_from_array</code><code class="p">(</code>
+    <code class="n">mulvar_valid</code><code class="o">.</code><code class="n">to_numpy</code><code class="p">(),</code>
+    <code class="n">targets</code><code class="o">=</code><code class="n">mulvar_valid</code><code class="p">[</code><code class="s2">"rail"</code><code class="p">][</code><code class="n">seq_length</code><code class="p">:],</code>
+    <code class="p">[</code><code class="o">...</code><code class="p">]</code>  <code class="c1"># the other 2 arguments are the same as earlier</code>
+<code class="p">)</code></pre>
+<p>And finally we create the RNN:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">mulvar_model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">([</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">SimpleRNN</code><code class="p">(</code><code class="mi">32</code><code class="p">,</code> <code class="n">input_shape</code><code class="o">=</code><code class="p">[</code><code class="kc">None</code><code class="p">,</code> <code class="mi">5</code><code class="p">]),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Dense</code><code class="p">(</code><code class="mi">1</code><code class="p">)</code>
+<code class="p">])</code></pre>
+<p>Notice that the only difference from the <code>univar_model</code> RNN we built earlier is the input shape: at each time step, the model now receives five inputs instead of one. This model actually reaches a validation MAE of 22,062. Now we’re making big progress!</p>
+<p>In fact, it’s not too hard to make the RNN forecast both the bus and rail ridership. You just need to change the targets when creating the datasets, setting them to <code>mulvar_train[["bus", "rail"]][seq_length:]</code> for the training set, and 
+<span class="keep-together"><code>mulvar_valid[["bus", "rail"]][seq_length:]</code></span> for the validation set. You must also add an extra neuron in the output <code>Dense</code> layer, since it must now make two forecasts: one for tomorrow’s bus ridership, and the other for rail. That’s all there is to it!</p>
+<p>As we discussed in <a data-type="xref" href="HOMLWSKT015.xhtml#ann_chapter">Chapter 10</a>, using a single model for multiple related tasks often results in better performance than using a separate model for each task, since features learned for one task may be useful for the other tasks, and also because having to perform well across multiple tasks prevents the model from overfitting (it’s a form of regularization). However, it depends on the task, and in this particular case the multitask RNN that forecasts both the bus and the rail ridership doesn’t perform quite as well as dedicated models that forecast one or the other (using all five columns as input). Still, it reaches a validation MAE of 25,330 for rail and 26,369 for bus, which is pretty good.<a data-primary="" data-startref="ix_time_series_multivariate" data-type="indexterm" id="idm45983086809360"></a><a data-primary="" data-startref="ix_multivariate_time" data-type="indexterm" id="idm45983086808448"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Forecasting Several Time Steps Ahead" data-type="sect2"><div class="sect2" id="idm45983087131232">
+<h2 id="sigil_toc_id_302" class="sigil_not_in_toc">Forecasting Several Time Steps Ahead</h2>
+<p>So far we have only predicted the value at the next time step, but we could just as easily have predicted the value several steps ahead by changing the targets appropriately (e.g., to predict the ridership 2 weeks from now, we could just change the targets to be the value 14 days ahead instead of 1 day ahead). <a data-primary="time series data, forecasting" data-secondary="several time steps ahead" data-type="indexterm" id="ix_time_series_steps"></a>But what if we want to predict the next 14 values?</p>
+<p>The first option is to take the <code>univar_model</code> RNN we trained earlier for the rail time series, make it predict the next value, and add that value to the inputs, acting as if the predicted value had actually occurred; we would then use the model again to predict the following value, and so on, as in the following code:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="kn">import</code> <code class="nn">numpy</code> <code class="k">as</code> <code class="nn">np</code>
+
+<code class="n">X</code> <code class="o">=</code> <code class="n">rail_valid</code><code class="o">.</code><code class="n">to_numpy</code><code class="p">()[</code><code class="n">np</code><code class="o">.</code><code class="n">newaxis</code><code class="p">,</code> <code class="p">:</code><code class="n">seq_length</code><code class="p">,</code> <code class="n">np</code><code class="o">.</code><code class="n">newaxis</code><code class="p">]</code>
+<code class="k">for</code> <code class="n">step_ahead</code> <code class="ow">in</code> <code class="nb">range</code><code class="p">(</code><code class="mi">14</code><code class="p">):</code>
+    <code class="n">y_pred_one</code> <code class="o">=</code> <code class="n">univar_model</code><code class="o">.</code><code class="n">predict</code><code class="p">(</code><code class="n">X</code><code class="p">)</code>
+    <code class="n">X</code> <code class="o">=</code> <code class="n">np</code><code class="o">.</code><code class="n">concatenate</code><code class="p">([</code><code class="n">X</code><code class="p">,</code> <code class="n">y_pred_one</code><code class="o">.</code><code class="n">reshape</code><code class="p">(</code><code class="mi">1</code><code class="p">,</code> <code class="mi">1</code><code class="p">,</code> <code class="mi">1</code><code class="p">)],</code> <code class="n">axis</code><code class="o">=</code><code class="mi">1</code><code class="p">)</code></pre>
+<p>In this code, we take the rail ridership of the first 56 days of the validation period, and we convert the data to a NumPy array of shape [1, 56, 1] (recall that recurrent layers expect 3D inputs). Then we repeatedly use the model to forecast the next value, and we append each forecast to the input series, along the time axis (<code>axis=1</code>). The resulting forecasts are plotted in <a data-type="xref" href="#forecast_ahead_plot">Figure 15-11</a>.</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>If the model makes an error at one time step, then the forecasts for the following time steps are impacted as well: the errors tend to accumulate. So, it’s preferable to use this technique only for a small number of steps.</p>
+</div>
+<figure><div class="figure" id="forecast_ahead_plot">
+<img alt="mls3 1511" height="238" src="../Images/mls3_1511.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-11. </span>Forecasting 14 steps ahead, 1 step at a time</h6>
+</div>
+</figure>
+<p>The second option is to train an RNN to predict the next 14 values in one shot. We can still use a sequence-to-vector model, but it will output 14 values instead of 1. However, we first need to change the targets to be vectors containing the next 14 values. To do this, we can use <code>timeseries_dataset_from_array()</code> again, but this time asking it to create datasets without targets (<code>targets=None</code>) and with longer sequences, of length <code>seq_length</code> + 14. Then we can use the datasets’ <code>map()</code> method to apply a custom function to each batch of sequences, splitting them into inputs and targets. In this example, we use the multivariate time series as input (using all five columns), and we forecast the rail ridership for the next 14 days:<sup><a data-type="noteref" href="#idm45983086723984" id="idm45983086723984-marker">6</a></sup></p>
+<pre data-code-language="python" data-type="programlisting"><code class="k">def</code> <code class="nf">split_inputs_and_targets</code><code class="p">(</code><code class="n">mulvar_series</code><code class="p">,</code> <code class="n">ahead</code><code class="o">=</code><code class="mi">14</code><code class="p">,</code> <code class="n">target_col</code><code class="o">=</code><code class="mi">1</code><code class="p">):</code>
+    <code class="k">return</code> <code class="n">mulvar_series</code><code class="p">[:,</code> <code class="p">:</code><code class="o">-</code><code class="n">ahead</code><code class="p">],</code> <code class="n">mulvar_series</code><code class="p">[:,</code> <code class="o">-</code><code class="n">ahead</code><code class="p">:,</code> <code class="n">target_col</code><code class="p">]</code>
+
+<code class="n">ahead_train_ds</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">utils</code><code class="o">.</code><code class="n">timeseries_dataset_from_array</code><code class="p">(</code>
+    <code class="n">mulvar_train</code><code class="o">.</code><code class="n">to_numpy</code><code class="p">(),</code>
+    <code class="n">targets</code><code class="o">=</code><code class="kc">None</code><code class="p">,</code>
+    <code class="n">sequence_length</code><code class="o">=</code><code class="n">seq_length</code> <code class="o">+</code> <code class="mi">14</code><code class="p">,</code>
+    <code class="p">[</code><code class="o">...</code><code class="p">]</code>  <code class="c1"># the other 3 arguments are the same as earlier</code>
+<code class="p">)</code><code class="o">.</code><code class="n">map</code><code class="p">(</code><code class="n">split_inputs_and_targets</code><code class="p">)</code>
+<code class="n">ahead_valid_ds</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">utils</code><code class="o">.</code><code class="n">timeseries_dataset_from_array</code><code class="p">(</code>
+    <code class="n">mulvar_valid</code><code class="o">.</code><code class="n">to_numpy</code><code class="p">(),</code>
+    <code class="n">targets</code><code class="o">=</code><code class="kc">None</code><code class="p">,</code>
+    <code class="n">sequence_length</code><code class="o">=</code><code class="n">seq_length</code> <code class="o">+</code> <code class="mi">14</code><code class="p">,</code>
+    <code class="n">batch_size</code><code class="o">=</code><code class="mi">32</code>
+<code class="p">)</code><code class="o">.</code><code class="n">map</code><code class="p">(</code><code class="n">split_inputs_and_targets</code><code class="p">)</code></pre>
+<p>Now we just need the output layer to have 14 units instead of 1:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">ahead_model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">([</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">SimpleRNN</code><code class="p">(</code><code class="mi">32</code><code class="p">,</code> <code class="n">input_shape</code><code class="o">=</code><code class="p">[</code><code class="kc">None</code><code class="p">,</code> <code class="mi">5</code><code class="p">]),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Dense</code><code class="p">(</code><code class="mi">14</code><code class="p">)</code>
+<code class="p">])</code></pre>
+<p>After training this model, you can predict the next 14 values at once like this:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">X</code> <code class="o">=</code> <code class="n">mulvar_valid</code><code class="o">.</code><code class="n">to_numpy</code><code class="p">()[</code><code class="n">np</code><code class="o">.</code><code class="n">newaxis</code><code class="p">,</code> <code class="p">:</code><code class="n">seq_length</code><code class="p">]</code>  <code class="c1"># shape [1, 56, 5]</code>
+<code class="n">Y_pred</code> <code class="o">=</code> <code class="n">ahead_model</code><code class="o">.</code><code class="n">predict</code><code class="p">(</code><code class="n">X</code><code class="p">)</code>  <code class="c1"># shape [1, 14]</code></pre>
+<p>This approach works quite well. Its forecasts for the next day are obviously better than its forecasts for 14 days into the future, but it doesn’t accumulate errors like the previous approach did. However, we can still do better, using a sequence-to-sequence (or <em>seq2seq</em>) model.<a data-primary="" data-startref="ix_time_series_steps" data-type="indexterm" id="idm45983086448624"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Forecasting Using a Sequence-to-Sequence Model" data-type="sect2"><div class="sect2" id="idm45983086806912">
+<h2 id="sigil_toc_id_303" class="sigil_not_in_toc">Forecasting Using a Sequence-to-Sequence Model</h2>
+<p>Instead of training the model to forecast the next 14 values only at the very last time step, we can train it to forecast the next 14 values at each and every time step. <a data-primary="sequence-to-sequence (seq2seq) network" data-type="indexterm" id="ix_seq2seq_time"></a><a data-primary="time series data, forecasting" data-secondary="with sequence-to-sequence model" data-secondary-sortas="sequence-to-sequence model" data-type="indexterm" id="ix_time_series_seq2seq"></a>In other words, we can turn this sequence-to-vector RNN into a sequence-to-sequence RNN. The advantage of this technique is that the loss will contain a term for the output of the RNN at each and every time step, not just for the output at the last time step.</p>
+<p>This means there will be many more error gradients flowing through the model, and they won’t have to flow through time as much since they will come from the output of each time step, not just the last one. This will both stabilize and speed up training.</p>
+<p>To be clear, at time step 0 the model will output a vector containing the forecasts for time steps 1 to 14, then at time step 1 the model will forecast time steps 2 to 15, and so on. In other words, the targets are sequences of consecutive windows, shifted by one time step at each time step. The target is not a vector anymore, but a sequence of the same length as the inputs, containing a 14-dimensional vector at each step.</p>
+<p>Preparing the datasets is not trivial, since each instance has a window as input and a sequence of windows as output. One way to do this is to use the <code>to_windows()</code> utility function we created earlier, twice in a row, to get windows of consecutive windows. For example, let’s turn the series of numbers 0 to 6 into a dataset containing sequences of 4 consecutive windows, each of length 3:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">my_series</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">data</code><code class="o">.</code><code class="n">Dataset</code><code class="o">.</code><code class="n">range</code><code class="p">(</code><code class="mi">7</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="n">dataset</code> <code class="o">=</code> <code class="n">to_windows</code><code class="p">(</code><code class="n">to_windows</code><code class="p">(</code><code class="n">my_series</code><code class="p">,</code> <code class="mi">3</code><code class="p">),</code> <code class="mi">4</code><code class="p">)</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="nb">list</code><code class="p">(</code><code class="n">dataset</code><code class="p">)</code>
+<code class="go">[&lt;tf.Tensor: shape=(4, 3), dtype=int64, numpy=</code>
+<code class="go"> array([[0, 1, 2],</code>
+<code class="go">        [1, 2, 3],</code>
+<code class="go">        [2, 3, 4],</code>
+<code class="go">        [3, 4, 5]])&gt;,</code>
+<code class="go"> &lt;tf.Tensor: shape=(4, 3), dtype=int64, numpy=</code>
+<code class="go"> array([[1, 2, 3],</code>
+<code class="go">        [2, 3, 4],</code>
+<code class="go">        [3, 4, 5],</code>
+<code class="go">        [4, 5, 6]])&gt;]</code></pre>
+<p>Now we can use the <code>map()</code> method to split these windows of windows into inputs and targets:</p>
+<pre data-code-language="pycon" data-type="programlisting"><code class="gp">&gt;&gt;&gt; </code><code class="n">dataset</code> <code class="o">=</code> <code class="n">dataset</code><code class="o">.</code><code class="n">map</code><code class="p">(</code><code class="k">lambda</code> <code class="n">S</code><code class="p">:</code> <code class="p">(</code><code class="n">S</code><code class="p">[:,</code> <code class="mi">0</code><code class="p">],</code> <code class="n">S</code><code class="p">[:,</code> <code class="mi">1</code><code class="p">:]))</code>
+<code class="gp">&gt;&gt;&gt; </code><code class="nb">list</code><code class="p">(</code><code class="n">dataset</code><code class="p">)</code>
+<code class="go">[(&lt;tf.Tensor: shape=(4,), dtype=int64, numpy=array([0, 1, 2, 3])&gt;,</code>
+<code class="go">  &lt;tf.Tensor: shape=(4, 2), dtype=int64, numpy=</code>
+<code class="go">  array([[1, 2],</code>
+<code class="go">         [2, 3],</code>
+<code class="go">         [3, 4],</code>
+<code class="go">         [4, 5]])&gt;),</code>
+<code class="go"> (&lt;tf.Tensor: shape=(4,), dtype=int64, numpy=array([1, 2, 3, 4])&gt;,</code>
+<code class="go">  &lt;tf.Tensor: shape=(4, 2), dtype=int64, numpy=</code>
+<code class="go">  array([[2, 3],</code>
+<code class="go">         [3, 4],</code>
+<code class="go">         [4, 5],</code>
+<code class="go">         [5, 6]])&gt;)]</code></pre>
+<p>Now the dataset contains sequences of length 4 as inputs, and the targets are sequences containing the next two steps, for each time step. For example, the first input sequence is [0, 1, 2, 3], and its corresponding targets are [[1, 2], [2, 3], [3, 4], [4, 5]], which are the next two values for each time step. If you’re like me, you will probably need a few minutes to wrap your head around this. Take your time!</p>
+<div data-type="note" epub:type="note"><h6 class="sigil_not_in_toc">Note</h6>
+<p>It may be surprising that the targets contain values that appear in the inputs. Isn’t that cheating? Fortunately, not at all: at each time step, an RNN only knows about past time steps; it cannot look ahead. <a data-primary="causal model" data-type="indexterm" id="idm45983086281984"></a>It is said to be a <em>causal</em> model.</p>
+</div>
+<p>Let’s create another little utility function to prepare the datasets for our sequence-to-sequence model. It will also take care of shuffling (optional) and batching:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="k">def</code> <code class="nf">to_seq2seq_dataset</code><code class="p">(</code><code class="n">series</code><code class="p">,</code> <code class="n">seq_length</code><code class="o">=</code><code class="mi">56</code><code class="p">,</code> <code class="n">ahead</code><code class="o">=</code><code class="mi">14</code><code class="p">,</code> <code class="n">target_col</code><code class="o">=</code><code class="mi">1</code><code class="p">,</code>
+                       <code class="n">batch_size</code><code class="o">=</code><code class="mi">32</code><code class="p">,</code> <code class="n">shuffle</code><code class="o">=</code><code class="kc">False</code><code class="p">,</code> <code class="n">seed</code><code class="o">=</code><code class="kc">None</code><code class="p">):</code>
+    <code class="n">ds</code> <code class="o">=</code> <code class="n">to_windows</code><code class="p">(</code><code class="n">tf</code><code class="o">.</code><code class="n">data</code><code class="o">.</code><code class="n">Dataset</code><code class="o">.</code><code class="n">from_tensor_slices</code><code class="p">(</code><code class="n">series</code><code class="p">),</code> <code class="n">ahead</code> <code class="o">+</code> <code class="mi">1</code><code class="p">)</code>
+    <code class="n">ds</code> <code class="o">=</code> <code class="n">to_windows</code><code class="p">(</code><code class="n">ds</code><code class="p">,</code> <code class="n">seq_length</code><code class="p">)</code><code class="o">.</code><code class="n">map</code><code class="p">(</code><code class="k">lambda</code> <code class="n">S</code><code class="p">:</code> <code class="p">(</code><code class="n">S</code><code class="p">[:,</code> <code class="mi">0</code><code class="p">],</code> <code class="n">S</code><code class="p">[:,</code> <code class="mi">1</code><code class="p">:,</code> <code class="mi">1</code><code class="p">]))</code>
+    <code class="k">if</code> <code class="n">shuffle</code><code class="p">:</code>
+        <code class="n">ds</code> <code class="o">=</code> <code class="n">ds</code><code class="o">.</code><code class="n">shuffle</code><code class="p">(</code><code class="mi">8</code> <code class="o">*</code> <code class="n">batch_size</code><code class="p">,</code> <code class="n">seed</code><code class="o">=</code><code class="n">seed</code><code class="p">)</code>
+    <code class="k">return</code> <code class="n">ds</code><code class="o">.</code><code class="n">batch</code><code class="p">(</code><code class="n">batch_size</code><code class="p">)</code></pre>
+<p>Now we can use this function to create the datasets:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">seq2seq_train</code> <code class="o">=</code> <code class="n">to_seq2seq_dataset</code><code class="p">(</code><code class="n">mulvar_train</code><code class="p">,</code> <code class="n">shuffle</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">seed</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">seq2seq_valid</code> <code class="o">=</code> <code class="n">to_seq2seq_dataset</code><code class="p">(</code><code class="n">mulvar_valid</code><code class="p">)</code></pre>
+<p class="pagebreak-before">And lastly, we can build the sequence-to-sequence model:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">seq2seq_model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">([</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">SimpleRNN</code><code class="p">(</code><code class="mi">32</code><code class="p">,</code> <code class="n">return_sequences</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">input_shape</code><code class="o">=</code><code class="p">[</code><code class="kc">None</code><code class="p">,</code> <code class="mi">5</code><code class="p">]),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Dense</code><code class="p">(</code><code class="mi">14</code><code class="p">)</code>
+<code class="p">])</code></pre>
+<p>It is almost identical to our previous model: the only difference is that we set <code>return_sequences=True</code> in the <code>SimpleRNN</code> layer. This way, it will output a sequence of vectors (each of size 32), instead of outputting a single vector at the last time step. The <code>Dense</code> layer is smart enough to handle sequences as input: it will be applied at each time step, taking a 32-dimensional vector as input and outputting a 14-dimensional vector. In fact, another way to get the exact same result is to use a <code>Conv1D</code> layer with a kernel size of 1: <code>Conv1D(14, kernel_size=1)</code>.</p>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p><a data-primary="Keras API" data-secondary="tf.keras.layers.TimeDistributed" data-type="indexterm" id="idm45983086017744"></a>Keras offers a <code>TimeDistributed</code> layer that lets you apply any vector-to-vector layer to every vector in the input sequences, at every time step. It does this efficiently, by reshaping the inputs so that each time step is treated as a separate instance, then it reshapes the layer’s outputs to recover the time dimension. In our case, we don’t need it since the <code>Dense</code> layer already supports sequences as inputs.</p>
+</div>
+<p>The training code is the same as usual. During training, all the model’s outputs are used, but after training only the output of the very last time step matters, and the rest can be ignored. For example, we can forecast the rail ridership for the next 14 days like this:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">X</code> <code class="o">=</code> <code class="n">mulvar_valid</code><code class="o">.</code><code class="n">to_numpy</code><code class="p">()[</code><code class="n">np</code><code class="o">.</code><code class="n">newaxis</code><code class="p">,</code> <code class="p">:</code><code class="n">seq_length</code><code class="p">]</code>
+<code class="n">y_pred_14</code> <code class="o">=</code> <code class="n">seq2seq_model</code><code class="o">.</code><code class="n">predict</code><code class="p">(</code><code class="n">X</code><code class="p">)[</code><code class="mi">0</code><code class="p">,</code> <code class="o">-</code><code class="mi">1</code><code class="p">]</code>  <code class="c1"># only the last time step's output</code></pre>
+<p>If you evaluate this model’s forecasts for <em>t</em> + 1, you will find a validation MAE of 25,519. For <em>t</em> + 2 it’s 26,274, and the performance continues to drop gradually as the model tries to forecast further into the future. At <em>t</em> + 14, the MAE is 34,322.</p>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>You can combine both approaches to forecasting multiple steps ahead: for example, you can train a model that forecasts 14 days ahead, then take its output and append it to the inputs, then run the model again to get forecasts for the following 14 days, and possibly repeat the process.<a data-primary="" data-startref="ix_time_series_ch15" data-type="indexterm" id="idm45983085986448"></a><a data-primary="" data-startref="ix_time_series_seq2seq" data-type="indexterm" id="idm45983085985472"></a><a data-primary="" data-startref="ix_seq2seq_time" data-type="indexterm" id="idm45983085984528"></a></p>
+</div>
+<p>Simple RNNs can be quite good at forecasting time series or handling other kinds of sequences, but they do not perform as well on long time series or sequences. Let’s discuss why and see what we can do about it.</p>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Handling Long Sequences" data-type="sect1"><div class="sect1" id="idm45983086446832">
+<h2 id="sigil_toc_id_304">Handling Long Sequences</h2>
+<p>To train an RNN on long sequences, we must run it over many time steps, making the unrolled RNN a very deep network. <a data-primary="long sequences, training RNN on" data-type="indexterm" id="ix_long_seq_rnn"></a><a data-primary="recurrent neural networks (RNNs)" data-secondary="handling long sequences" data-type="indexterm" id="ix_rnn_long_seq"></a>Just like any deep neural network it may suffer from the unstable gradients problem, discussed in <a data-type="xref" href="HOMLWSKT016.xhtml#deep_chapter">Chapter 11</a>: it may take forever to train, or training may be unstable. Moreover, when an RNN processes a long sequence, it will gradually forget the first inputs in the sequence. Let’s look at both these problems, starting with the unstable gradients problem.</p>
+<section data-pdf-bookmark="Fighting the Unstable Gradients Problem" data-type="sect2"><div class="sect2" id="idm45983085979920">
+<h2 id="sigil_toc_id_305" class="sigil_not_in_toc">Fighting the Unstable Gradients Problem</h2>
+<p>Many of the tricks we used in deep nets to alleviate the unstable gradients problem can also be used for RNNs: good parameter initialization, faster optimizers, dropout, and so on. <a data-primary="unstable gradients problem" data-type="indexterm" id="ix_unstable_grad_probunstable_gradients_problem"></a><a data-primary="vanishing and exploding gradients" data-secondary="unstable gradients problem" data-type="indexterm" id="ix_vanish_exp_grad_unstable"></a><a data-primary="long sequences, training RNN on" data-secondary="unstable gradients problem" data-type="indexterm" id="ix_long_seq_rnn_unstable"></a><a data-primary="ReLU (rectified linear units)" data-secondary="RNN unstable gradients problem" data-type="indexterm" id="idm45983085974656"></a>However, nonsaturating activation functions (e.g., ReLU) may not help as much here. In fact, they may actually lead the RNN to be even more unstable during training. Why? Well, suppose gradient descent updates the weights in a way that increases the outputs slightly at the first time step. Because the same weights are used at every time step, the outputs at the second time step may also be slightly increased, and those at the third, and so on until the outputs explode—and a nonsaturating activation function does not prevent that.</p>
+<p>You can reduce this risk by using a smaller learning rate, or you can use a saturating activation function like the hyperbolic tangent (this explains why it’s the default).<a data-primary="activation functions" data-secondary="hyperbolic tangent (htan)" data-type="indexterm" id="idm45983085972976"></a><a data-primary="hyperbolic tangent (htan)" data-type="indexterm" id="idm45983085971984"></a></p>
+<p>In much the same way, the gradients themselves can explode. If you notice that training is unstable, you may want to monitor the size of the gradients (e.g., using TensorBoard) and perhaps use gradient clipping.</p>
+<p>Moreover, batch normalization cannot be used as efficiently with RNNs as with deep feedforward nets.<a data-primary="batch normalization (BN)" data-type="indexterm" id="idm45983085970384"></a><a data-primary="BN (batch normalization)" data-type="indexterm" id="idm45983085969664"></a><a data-primary="normalization" data-type="indexterm" id="idm45983085968976"></a> In fact, you cannot use it between time steps, only between recurrent layers.</p>
+<p>To be more precise, it is technically possible to add a BN layer to a memory cell (as you will see shortly) so that it will be applied at each time step (both on the inputs for that time step and on the hidden state from the previous step). However, the same BN layer will be used at each time step, with the same parameters, regardless of the actual scale and offset of the inputs and hidden state. In practice, this does not yield good results, as was demonstrated by César Laurent et al. in a <a href="https://homl.info/rnnbn">2015 paper</a>:⁠<sup><a data-type="noteref" href="#idm45983085938976" id="idm45983085938976-marker">7</a></sup> the authors found that BN was slightly beneficial only when it was applied to the layer’s inputs, not to the hidden states. In other words, it was slightly better than nothing when applied between recurrent layers (i.e., vertically in <a data-type="xref" href="#deep_rnn_diagram">Figure 15-10</a>), but not within recurrent layers (i.e., horizontally). In Keras, you can apply BN between layers simply by adding a <code>BatchNormalization</code> layer before each recurrent layer, but it will slow down training, and it may not help much.</p>
+<p>Another form of normalization often works better with RNNs: <em>layer normalization</em>. <a data-primary="Keras API" data-secondary="tf.keras.layers.LayerNormalization" data-type="indexterm" id="idm45983085935504"></a><a data-primary="layer normalization" data-type="indexterm" id="idm45983085934592"></a><a data-primary="Keras API" data-secondary="tf.keras.layers.BatchNormalization" data-type="indexterm" id="idm45983085933920"></a><a data-primary="recurrent layer normalization" data-type="indexterm" id="idm45983085933008"></a>This idea was introduced by Jimmy Lei Ba et al. in a <a href="https://homl.info/layernorm">2016 paper</a>:⁠<sup><a data-type="noteref" href="#idm45983085931520" id="idm45983085931520-marker">8</a></sup> it is very similar to batch normalization, but instead of normalizing across the batch dimension, layer normalization normalizes across the features dimension. One advantage is that it can compute the required statistics on the fly, at each time step, independently for each instance. This also means that it behaves the same way during training and testing (as opposed to BN), and it does not need to use exponential <span class="keep-together">moving</span> averages to estimate the feature statistics across all instances in the training set, like BN does. Like BN, layer normalization learns a scale and an offset parameter for each input. In an RNN, it is typically used right after the linear combination of the inputs and the hidden states.</p>
+<p>Let’s use Keras to implement layer normalization within a simple memory cell. To do this, we need to define a custom memory cell, which is just like a regular layer, except its <code>call()</code> method takes two arguments: the <code>inputs</code> at the current time step and the hidden <code>states</code> from the previous time step.</p>
+<p>Note that the <code>states</code> argument is a list containing one or more tensors. In the case of a simple RNN cell it contains a single tensor equal to the outputs of the previous time step, but other cells may have multiple state tensors (e.g., an <code>LSTMCell</code> has a long-term state and a short-term state, as you will see shortly). A cell must also have a <code>state_size</code> attribute and an <code>output_size</code> attribute. In a simple RNN, both are simply equal to the number of units. The following code implements a custom memory cell that will behave like a <code>SimpleRNNCell</code>, except it will also apply layer normalization at each time step:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="k">class</code> <code class="nc">LNSimpleRNNCell</code><code class="p">(</code><code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Layer</code><code class="p">):</code>
+    <code class="k">def</code> <code class="fm">__init__</code><code class="p">(</code><code class="bp">self</code><code class="p">,</code> <code class="n">units</code><code class="p">,</code> <code class="n">activation</code><code class="o">=</code><code class="s2">"tanh"</code><code class="p">,</code> <code class="o">**</code><code class="n">kwargs</code><code class="p">):</code>
+        <code class="nb">super</code><code class="p">()</code><code class="o">.</code><code class="fm">__init__</code><code class="p">(</code><code class="o">**</code><code class="n">kwargs</code><code class="p">)</code>
+        <code class="bp">self</code><code class="o">.</code><code class="n">state_size</code> <code class="o">=</code> <code class="n">units</code>
+        <code class="bp">self</code><code class="o">.</code><code class="n">output_size</code> <code class="o">=</code> <code class="n">units</code>
+        <code class="bp">self</code><code class="o">.</code><code class="n">simple_rnn_cell</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">SimpleRNNCell</code><code class="p">(</code><code class="n">units</code><code class="p">,</code>
+                                                             <code class="n">activation</code><code class="o">=</code><code class="kc">None</code><code class="p">)</code>
+        <code class="bp">self</code><code class="o">.</code><code class="n">layer_norm</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">LayerNormalization</code><code class="p">()</code>
+        <code class="bp">self</code><code class="o">.</code><code class="n">activation</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">activations</code><code class="o">.</code><code class="n">get</code><code class="p">(</code><code class="n">activation</code><code class="p">)</code>
+
+    <code class="k">def</code> <code class="nf">call</code><code class="p">(</code><code class="bp">self</code><code class="p">,</code> <code class="n">inputs</code><code class="p">,</code> <code class="n">states</code><code class="p">):</code>
+        <code class="n">outputs</code><code class="p">,</code> <code class="n">new_states</code> <code class="o">=</code> <code class="bp">self</code><code class="o">.</code><code class="n">simple_rnn_cell</code><code class="p">(</code><code class="n">inputs</code><code class="p">,</code> <code class="n">states</code><code class="p">)</code>
+        <code class="n">norm_outputs</code> <code class="o">=</code> <code class="bp">self</code><code class="o">.</code><code class="n">activation</code><code class="p">(</code><code class="bp">self</code><code class="o">.</code><code class="n">layer_norm</code><code class="p">(</code><code class="n">outputs</code><code class="p">))</code>
+        <code class="k">return</code> <code class="n">norm_outputs</code><code class="p">,</code> <code class="p">[</code><code class="n">norm_outputs</code><code class="p">]</code></pre>
+<p>Let’s walk through this code:</p>
+<ul>
+<li>
+<p>Our <code>LNSimpleRNNCell</code> class inherits from the <code>tf.keras.layers.Layer</code> class, just like any custom layer.</p>
+</li>
+<li>
+<p>The constructor takes the number of units and the desired activation function and sets the <code>state_size</code> and <span class="keep-together"><code>output_size</code></span> attributes, then creates a <code>SimpleRNNCell</code> with no activation function (because we want to perform layer normalization after the linear operation but before the activation function).⁠<sup><a data-type="noteref" href="#idm45983085849968" id="idm45983085849968-marker">9</a></sup> Then the constructor creates the <code>LayerNormalization</code> layer, and finally it fetches the desired activation function.</p>
+</li>
+<li>
+<p>The <code>call()</code> method starts by applying the <code>simpleRNNCell</code>, which computes a linear combination of the current inputs and the previous hidden states, and it returns the result twice (indeed, in a <code>SimpleRNNCell</code>, the outputs are just equal to the hidden states: in other words, <code>new_states[0]</code> is equal to <code>outputs</code>, so we can safely ignore <code>new_states</code> in the rest of the <code>call()</code> method). Next, the <code>call()</code> method applies layer normalization, followed by the activation function. Finally, it returns the outputs twice: once as the outputs, and once as the new hidden states. To use this custom cell, all we need to do is create a <code>tf.keras.layers.RNN</code> layer, passing it a cell instance:</p>
+</li>
+</ul>
+<pre data-code-language="python" data-type="programlisting"><code class="n">custom_ln_model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">([</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">RNN</code><code class="p">(</code><code class="n">LNSimpleRNNCell</code><code class="p">(</code><code class="mi">32</code><code class="p">),</code> <code class="n">return_sequences</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code>
+                        <code class="n">input_shape</code><code class="o">=</code><code class="p">[</code><code class="kc">None</code><code class="p">,</code> <code class="mi">5</code><code class="p">]),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Dense</code><code class="p">(</code><code class="mi">14</code><code class="p">)</code>
+<code class="p">])</code></pre>
+<p>Similarly, you could create a custom cell to apply dropout between each time step. But there’s a simpler way: most recurrent layers and cells provided by Keras have <code>dropout</code> and <code>recurrent_dropout</code> hyperparameters: the former defines the dropout rate to apply to the inputs, and the latter defines the dropout rate for the hidden states, between time steps. So, there’s no need to create a custom cell to apply dropout at each time step in an RNN.</p>
+<p>With these techniques, you can alleviate the unstable gradients problem and train an RNN much more efficiently. Now let’s look at how to deal with the short-term memory problem.</p>
+<div data-type="tip"><h6 class="sigil_not_in_toc">Tip</h6>
+<p>When forecasting time series, it is often useful to have some error bars along with your predictions. For this, one approach is to use MC dropout, introduced in <a data-type="xref" href="HOMLWSKT016.xhtml#deep_chapter">Chapter 11</a>: use <code>recurrent_dropout</code> during training, then keep dropout active at inference time by 
+<span class="keep-together">calling</span> the model using <code>model(X, training=True)</code>. Repeat this several times to get multiple slightly different forecasts, then compute the mean and standard deviation of these predictions for each time step.<a data-primary="" data-startref="ix_long_seq_rnn_unstable" data-type="indexterm" id="idm45983085659552"></a><a data-primary="" data-startref="ix_unstable_grad_prob" data-type="indexterm" id="idm45983085658608"></a><a data-primary="" data-startref="ix_vanish_exp_grad_unstable" data-type="indexterm" id="idm45983085657664"></a></p>
+</div>
+</div>
+</section>
+<section data-pdf-bookmark="Tackling the Short-Term Memory Problem" data-type="sect2"><div class="sect2" id="idm45983085979328">
+<h2 id="sigil_toc_id_306" class="sigil_not_in_toc">Tackling the Short-Term Memory Problem</h2>
+<p>Due to the transformations that the data goes through when traversing an RNN, some information is lost at each time step. <a data-primary="long sequences, training RNN on" data-secondary="short-term memory problem" data-type="indexterm" id="ix_long_seq_short_mem"></a><a data-primary="memory cells (cells), RNNs" data-type="indexterm" id="ix_mem_cell_rnn"></a><a data-primary="recurrent neural networks (RNNs)" data-secondary="memory cells" data-type="indexterm" id="ix_rnn_mem_cell"></a>After a while, the RNN’s state contains virtually no trace of the first inputs. This can be a showstopper. Imagine Dory the fish⁠<sup><a data-type="noteref" href="#idm45983085649872" id="idm45983085649872-marker">10</a></sup> trying to translate a long sentence; by the time she’s finished reading it, she has no clue how it started. To tackle this problem, various types of cells with long-term memory have been introduced. They have proven so successful that the basic cells are not used much anymore. Let’s first look at the most popular of these long-term memory cells: the LSTM cell.</p>
+<section data-pdf-bookmark="LSTM cells" data-type="sect3"><div class="sect3" id="idm45983085648208">
+<h3 class="sigil_not_in_toc">LSTM cells</h3>
+<p>The <em>long short-term memory</em> (LSTM) cell was <a href="https://homl.info/93">proposed in 1997</a>⁠<sup><a data-type="noteref" href="#idm45983085645024" id="idm45983085645024-marker">11</a></sup> by Sepp Hochreiter and Jürgen Schmidhuber and gradually improved over the years by several researchers, such as <a href="https://homl.info/graves">Alex Graves</a>, <a href="https://homl.info/94">Haşim Sak</a>,⁠<sup><a data-type="noteref" href="#idm45983085642320" id="idm45983085642320-marker">12</a></sup> and <a href="https://homl.info/95">Wojciech Zaremba</a>.⁠<sup><a data-type="noteref" href="#idm45983085640720" id="idm45983085640720-marker">13</a></sup> <a data-primary="long short-term memory (LSTM) cell" data-type="indexterm" id="ix_longshort_mem_lstm"></a><a data-primary="LSTM (long short-term memory) cell" data-type="indexterm" id="ix_lstm_long_mem"></a>If you consider the LSTM cell as a black box, it can be used very much like a basic cell, except it will perform much better; training will converge faster, and it will detect longer-term patterns in the data. In Keras, you can simply use the <code>LSTM</code> layer instead of the <code>SimpleRNN</code> layer:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">([</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">LSTM</code><code class="p">(</code><code class="mi">32</code><code class="p">,</code> <code class="n">return_sequences</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">input_shape</code><code class="o">=</code><code class="p">[</code><code class="kc">None</code><code class="p">,</code> <code class="mi">5</code><code class="p">]),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Dense</code><code class="p">(</code><code class="mi">14</code><code class="p">)</code>
+<code class="p">])</code></pre>
+<p>Alternatively, you could use the general-purpose <code>tf.keras.layers.RNN</code> layer, giving it an <code>LSTMCell</code> as an argument. <a data-primary="Keras API" data-secondary="tf.keras.layers.LSTM" data-type="indexterm" id="idm45983085593648"></a><a data-primary="Keras API" data-secondary="tf.keras.layers.RNN" data-type="indexterm" id="idm45983085592704"></a>However, the <code>LSTM</code> layer uses an optimized 
+<span class="keep-together">implementation</span> when running on a GPU (see <a data-type="xref" href="HOMLWSKT024.xhtml#deployment_chapter">Chapter 19</a>), so in general it is preferable to use it (the <code>RNN</code> layer is mostly useful when you define custom cells, as we did earlier).</p>
+<p>So how does an LSTM cell work? Its architecture is shown in <a data-type="xref" href="#lstm_cell_diagram">Figure 15-12</a>. If you don’t look at what’s inside the box, the LSTM cell looks exactly like a regular cell, except that its state is split into two vectors: <strong>h</strong><sub>(<em>t</em>)</sub> and <strong>c</strong><sub>(<em>t</em>)</sub> (“c” stands for “cell”). You can think of <strong>h</strong><sub>(<em>t</em>)</sub> as the short-term state and <strong>c</strong><sub>(<em>t</em>)</sub> as the long-term state.</p>
+<figure><div class="figure" id="lstm_cell_diagram">
+<img alt="mls3 1512" height="402" src="../Images/mls3_1512.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-12. </span>An LSTM cell</h6>
+</div>
+</figure>
+<p>Now let’s open the box! The key idea is that the network can learn what to store in the long-term state, what to throw away, and what to read from it. <a data-primary="forget gate, LSTM" data-type="indexterm" id="idm45983085552512"></a><a data-primary="input gate, LSTM" data-type="indexterm" id="idm45983085551488"></a><a data-primary="output gate, LSTM" data-type="indexterm" id="idm45983085550848"></a>As the long-term state <strong>c</strong><sub>(<em>t</em>–1)</sub> traverses the network from left to right, you can see that it first goes through a <em>forget gate</em>, dropping some memories, and then it adds some new memories via the addition operation (which adds the memories that were selected by an <em>input gate</em>). The result <strong>c</strong><sub>(<em>t</em>)</sub> is sent straight out, without any further transformation. So, at each time step, some memories are dropped and some memories are added. Moreover, after the addition operation, the long-term state is copied and passed through the tanh function, and then the result is filtered by the <em>output gate</em>. This produces the short-term state <strong>h</strong><sub>(<em>t</em>)</sub> (which is equal to the cell’s output for this time step, <strong>y</strong><sub>(<em>t</em>)</sub>). Now let’s look at where new memories come from and how the gates work.</p>
+<p>First, the current input vector <strong>x</strong><sub>(<em>t</em>)</sub> and the previous short-term state <strong>h</strong><sub>(<em>t</em>–1)</sub> are fed to four different fully connected layers. They all serve a different purpose:</p>
+<ul>
+<li>
+<p>The main layer is the one that outputs <strong>g</strong><sub>(<em>t</em>)</sub>. It has the usual role of analyzing the current inputs <strong>x</strong><sub>(<em>t</em>)</sub> and the previous (short-term) state <strong>h</strong><sub>(<em>t</em>–1)</sub>. In a basic cell, there is nothing other than this layer, and its output goes straight out to <strong>y</strong><sub>(<em>t</em>)</sub> and <strong>h</strong><sub>(<em>t</em>)</sub>. But in an LSTM cell, this layer’s output does not go straight out; instead its most important parts are stored in the long-term state (and the rest is dropped).</p>
+</li>
+<li>
+<p>The three other layers are <em>gate controllers</em>. <a data-primary="gate controllers, LSTM" data-type="indexterm" id="idm45983085532544"></a>Since they use the logistic activation function, the outputs range from 0 to 1. As you can see, the gate controllers’ outputs are fed to element-wise multiplication operations: if they output 0s they close the gate, and if they output 1s they open it. Specifically:</p>
+<ul>
+<li>
+<p>The <em>forget gate</em> (controlled by <strong>f</strong><sub>(<em>t</em>)</sub>) controls which parts of the long-term state should be erased.</p>
+</li>
+<li>
+<p>The <em>input gate</em> (controlled by <strong>i</strong><sub>(<em>t</em>)</sub>) controls which parts of <strong>g</strong><sub>(<em>t</em>)</sub> should be added to the long-term state.</p>
+</li>
+<li>
+<p>Finally, the <em>output gate</em> (controlled by <strong>o</strong><sub>(<em>t</em>)</sub>) controls which parts of the long-term state should be read and output at this time step, both to <strong>h</strong><sub>(<em>t</em>)</sub> and to <strong>y</strong><sub>(<em>t</em>)</sub>.</p>
+</li>
+</ul>
+</li>
+</ul>
+<p>In short, an LSTM cell can learn to recognize an important input (that’s the role of the input gate), store it in the long-term state, preserve it for as long as it is needed (that’s the role of the forget gate), and extract it whenever it is needed. This explains why these cells have been amazingly successful at capturing long-term patterns in time series, long texts, audio recordings, and more.</p>
+<p><a data-type="xref" href="#lstm_equation">Equation 15-4</a> summarizes how to compute the cell’s long-term state, its short-term state, and its output at each time step for a single instance (the equations for a whole mini-batch are very similar).</p>
+<div data-type="equation" id="lstm_equation"><h5 class="sigil_not_in_toc"><span class="label">Equation 15-4. </span>LSTM computations</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">i</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mi>σ</mi>
+<mo>(</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>x</mi><mi>i</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>h</mi><mi>i</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">h</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msub><mi mathvariant="bold">b</mi> <mi>i</mi> </msub>
+<mo>)</mo>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">f</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mi>σ</mi>
+<mo>(</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>x</mi><mi>f</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>h</mi><mi>f</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">h</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msub><mi mathvariant="bold">b</mi> <mi>f</mi> </msub>
+<mo>)</mo>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">o</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mi>σ</mi>
+<mo>(</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>x</mi><mi>o</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>h</mi><mi>o</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">h</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msub><mi mathvariant="bold">b</mi> <mi>o</mi> </msub>
+<mo>)</mo>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">g</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mo form="prefix">tanh</mo>
+<mo>(</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>x</mi><mi>g</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>h</mi><mi>g</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">h</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msub><mi mathvariant="bold">b</mi> <mi>g</mi> </msub>
+<mo>)</mo>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">c</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<msub><mi mathvariant="bold">f</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>⊗</mo>
+<msub><mi mathvariant="bold">c</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+<mspace width="0.166667em"/>
+<mo>+</mo>
+<mspace width="0.166667em"/>
+<msub><mi mathvariant="bold">i</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>⊗</mo>
+<msub><mi mathvariant="bold">g</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">y</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<msub><mi mathvariant="bold">h</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>=</mo>
+<msub><mi mathvariant="bold">o</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>⊗</mo>
+<mo form="prefix">tanh</mo>
+<mrow>
+<mo>(</mo>
+<msub><mi mathvariant="bold">c</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>)</mo>
+</mrow>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>In this equation:</p>
+<ul>
+<li>
+<p><strong>W</strong><sub><em>xi</em></sub>, <strong>W</strong><sub><em>xf</em></sub>, <strong>W</strong><sub><em>xo</em></sub>, and <strong>W</strong><sub><em>xg</em></sub> are the weight matrices of each of the four layers for their connection to the input vector <strong>x</strong><sub>(<em>t</em>)</sub>.</p>
+</li>
+<li>
+<p><strong>W</strong><sub><em>hi</em></sub>, <strong>W</strong><sub><em>hf</em></sub>, <strong>W</strong><sub><em>ho</em></sub>, and <strong>W</strong><sub><em>hg</em></sub> are the weight matrices of each of the four layers for their connection to the previous short-term state <strong>h</strong><sub>(<em>t</em>–1)</sub>.</p>
+</li>
+<li>
+<p><strong>b</strong><sub><em>i</em></sub>, <strong>b</strong><sub><em>f</em></sub>, <strong>b</strong><sub><em>o</em></sub>, and <strong>b</strong><sub><em>g</em></sub> are the bias terms for each of the four layers. Note that TensorFlow initializes <strong>b</strong><sub><em>f</em></sub> to a vector full of 1s instead of 0s. This prevents forgetting everything at the beginning of training.</p>
+</li>
+</ul>
+<p>There are several variants of the LSTM cell. One particularly popular variant is the GRU cell, which we will look at now.<a data-primary="" data-startref="ix_lstm_long_mem" data-type="indexterm" id="idm45983085389792"></a><a data-primary="" data-startref="ix_longshort_mem_lstm" data-type="indexterm" id="idm45983085388816"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="GRU cells" data-type="sect3"><div class="sect3" id="idm45983085647616">
+<h3 class="sigil_not_in_toc">GRU cells</h3>
+<p>The <em>gated recurrent unit</em> (GRU) cell (see <a data-type="xref" href="#gru_cell_diagram">Figure 15-13</a>) was proposed by Kyunghyun Cho et al. in a <a href="https://homl.info/97">2014 paper</a>⁠<sup><a data-type="noteref" href="#idm45983085384208" id="idm45983085384208-marker">14</a></sup> that also introduced the encoder–decoder network we discussed earlier.<a data-primary="GRU (gated recurrent unit) cell" data-type="indexterm" id="ix_gru_cell"></a><a data-primary="gated recurrent unit (GRU) cell" data-type="indexterm" id="ix_gated_recurr_gru_cell"></a></p>
+<figure class="width-80"><div class="figure" id="gru_cell_diagram">
+<img alt="mls3 1513" height="514" src="../Images/mls3_1513.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-13. </span>GRU cell</h6>
+</div>
+</figure>
+<p>The GRU cell is a simplified version of the LSTM cell, and it seems to perform just as well⁠<sup><a data-type="noteref" href="#idm45983085378608" id="idm45983085378608-marker">15</a></sup> (which explains its growing popularity). These are the main simplifications:</p>
+<ul>
+<li>
+<p>Both state vectors are merged into a single vector <strong>h</strong><sub>(<em>t</em>)</sub>.</p>
+</li>
+<li>
+<p>A single gate controller <strong>z</strong><sub>(<em>t</em>)</sub> controls both the forget gate and the input gate. If the gate controller outputs a 1, the forget gate is open (= 1) and the input gate is closed (1 – 1 = 0). If it outputs a 0, the opposite happens. In other words, whenever a memory must be stored, the location where it will be stored is erased first. This is actually a frequent variant to the LSTM cell in and of itself.</p>
+</li>
+<li>
+<p>There is no output gate; the full state vector is output at every time step. However, there is a new gate controller <strong>r</strong><sub>(<em>t</em>)</sub> that controls which part of the previous state will be shown to the main layer (<strong>g</strong><sub>(<em>t</em>)</sub>).</p>
+</li>
+</ul>
+<p><a data-type="xref" href="#gru_equation">Equation 15-5</a> summarizes how to compute the cell’s state at each time step for a single instance.</p>
+<div data-type="equation" id="gru_equation"><h5 class="sigil_not_in_toc"><span class="label">Equation 15-5. </span>GRU computations</h5>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+<mtable displaystyle="true">
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">z</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mi>σ</mi>
+<mo>(</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>x</mi><mi>z</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>h</mi><mi>z</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">h</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msub><mi mathvariant="bold">b</mi><mi>z</mi></msub>
+<mo>)</mo>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">r</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mi>σ</mi>
+<mo>(</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>x</mi><mi>r</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>h</mi><mi>r</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">h</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msub><mi mathvariant="bold">b</mi><mi>r</mi></msub>
+<mo>)</mo>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">g</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<mo form="prefix">tanh</mo>
+<mfenced close=")" open="(" separators="">
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>x</mi><mi>g</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<msub><mi mathvariant="bold">x</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<msup><mrow><msub><mi mathvariant="bold">W</mi> <mrow><mi>h</mi><mi>g</mi></mrow> </msub></mrow> <mo>⊺</mo> </msup>
+<mrow>
+<mo>(</mo>
+<msub><mi mathvariant="bold">r</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>⊗</mo>
+<msub><mi mathvariant="bold">h</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+<mo>)</mo>
+</mrow>
+<mo>+</mo>
+<msub><mi mathvariant="bold">b</mi><mi>g</mi></msub>
+</mfenced>
+</mrow>
+</mtd>
+</mtr>
+<mtr>
+<mtd columnalign="right">
+<msub><mi mathvariant="bold">h</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mtd>
+<mtd columnalign="left">
+<mrow>
+<mo>=</mo>
+<msub><mi mathvariant="bold">z</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>⊗</mo>
+<msub><mi mathvariant="bold">h</mi> <mrow><mo>(</mo><mi>t</mi><mo>-</mo><mn>1</mn><mo>)</mo></mrow> </msub>
+<mo>+</mo>
+<mrow>
+<mo>(</mo>
+<mn>1</mn>
+<mo>-</mo>
+<msub><mi mathvariant="bold">z</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+<mo>)</mo>
+</mrow>
+<mo>⊗</mo>
+<msub><mi mathvariant="bold">g</mi> <mrow><mo>(</mo><mi>t</mi><mo>)</mo></mrow> </msub>
+</mrow>
+</mtd>
+</mtr>
+</mtable>
+</math>
+</div>
+<p>Keras provides a <code>tf.keras.layers.GRU</code> layer: using it is just a matter of replacing <code>SimpleRNN</code> or <code>LSTM</code> with <code>GRU</code>. It also provides a <code>tf.keras.layers.GRUCell</code>, in case you want to create a custom cell based on a GRU cell.<a data-primary="Keras API" data-secondary="tf.keras.layers.GRU" data-type="indexterm" id="idm45983085282720"></a><a data-primary="Keras API" data-secondary="tf.keras.layers.GRUCell" data-type="indexterm" id="idm45983085281664"></a></p>
+<p>LSTM and GRU cells are one of the main reasons behind the success of RNNs. Yet while they can tackle much longer sequences than simple RNNs, they still have a fairly limited short-term memory, and they have a hard time learning long-term patterns in sequences of 100 time steps or more, such as audio samples, long time series, or long sentences. One way to solve this is to shorten the input sequences; for example, using 1D convolutional layers.<a data-primary="" data-startref="ix_gru_cell" data-type="indexterm" id="idm45983085280464"></a><a data-primary="" data-startref="ix_gated_recurr_gru_cell" data-type="indexterm" id="idm45983085279488"></a></p>
+</div>
+</section>
+<section data-pdf-bookmark="Using 1D convolutional layers to process sequences" data-type="sect3"><div class="sect3" id="idm45983085278448">
+<h3 class="sigil_not_in_toc">Using 1D convolutional layers to process sequences</h3>
+<p>In <a data-type="xref" href="HOMLWSKT019.xhtml#cnn_chapter">Chapter 14</a>, we saw that a 2D convolutional layer works by sliding several fairly small kernels (or filters) across an image, producing multiple 2D feature maps (one per kernel). <a data-primary="1D convolutional layers" data-primary-sortas="oneD convolutional layers" data-type="indexterm" id="idm45983085275728"></a><a data-primary="convolutional neural networks (CNNs)" data-secondary="convolutional layers" data-type="indexterm" id="idm45983085274784"></a>Similarly, a 1D convolutional layer slides several kernels across a sequence, producing a 1D feature map per kernel. Each kernel will learn to detect a single very short sequential pattern (no longer than the kernel size). If you use 10 kernels, then the layer’s output will be composed of 10 1D sequences (all of the same length), or equivalently you can view this output as a single 10D sequence. This means that you can build a neural network composed of a mix of recurrent layers and 1D convolutional layers (or even 1D pooling layers). <a data-primary="strides" data-type="indexterm" id="idm45983085273744"></a>If you use a 1D convolutional layer with a stride of 1 and <code>"same"</code> padding, then the output sequence will have the same length as the input sequence. But if you use <code>"valid"</code> padding or a stride greater than 1, then the output sequence will be shorter than the input sequence, so make sure you adjust the targets accordingly.</p>
+<p>For example, the following model is the same as earlier, except it starts with a 1D convolutional layer that downsamples the input sequence by a factor of 2, using a stride of 2. The kernel size is larger than the stride, so all inputs will be used to compute the layer’s output, and therefore the model can learn to preserve the useful information, dropping only the unimportant details. <a data-primary="sequence length" data-type="indexterm" id="idm45983085271696"></a>By shortening the sequences the convolutional layer may help the <code>GRU</code> layers detect longer patterns, so we can afford to double the input sequence length to 112 days. Note that we must also crop off the first three time steps in the targets: indeed, the kernel’s size is 4, so the first output of the convolutional layer will be based on the input time steps 0 to 3, and the first forecasts will be for time steps 4 to 17 (instead of time steps 1 to 14). Moreover, we must downsample the targets by a factor of 2, because of the stride:</p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">conv_rnn_model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">([</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Conv1D</code><code class="p">(</code><code class="n">filters</code><code class="o">=</code><code class="mi">32</code><code class="p">,</code> <code class="n">kernel_size</code><code class="o">=</code><code class="mi">4</code><code class="p">,</code> <code class="n">strides</code><code class="o">=</code><code class="mi">2</code><code class="p">,</code>
+                           <code class="n">activation</code><code class="o">=</code><code class="s2">"relu"</code><code class="p">,</code> <code class="n">input_shape</code><code class="o">=</code><code class="p">[</code><code class="kc">None</code><code class="p">,</code> <code class="mi">5</code><code class="p">]),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">GRU</code><code class="p">(</code><code class="mi">32</code><code class="p">,</code> <code class="n">return_sequences</code><code class="o">=</code><code class="kc">True</code><code class="p">),</code>
+    <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Dense</code><code class="p">(</code><code class="mi">14</code><code class="p">)</code>
+<code class="p">])</code>
+
+<code class="n">longer_train</code> <code class="o">=</code> <code class="n">to_seq2seq_dataset</code><code class="p">(</code><code class="n">mulvar_train</code><code class="p">,</code> <code class="n">seq_length</code><code class="o">=</code><code class="mi">112</code><code class="p">,</code>
+                                       <code class="n">shuffle</code><code class="o">=</code><code class="kc">True</code><code class="p">,</code> <code class="n">seed</code><code class="o">=</code><code class="mi">42</code><code class="p">)</code>
+<code class="n">longer_valid</code> <code class="o">=</code> <code class="n">to_seq2seq_dataset</code><code class="p">(</code><code class="n">mulvar_valid</code><code class="p">,</code> <code class="n">seq_length</code><code class="o">=</code><code class="mi">112</code><code class="p">)</code>
+<code class="n">downsampled_train</code> <code class="o">=</code> <code class="n">longer_train</code><code class="o">.</code><code class="n">map</code><code class="p">(</code><code class="k">lambda</code> <code class="n">X</code><code class="p">,</code> <code class="n">Y</code><code class="p">:</code> <code class="p">(</code><code class="n">X</code><code class="p">,</code> <code class="n">Y</code><code class="p">[:,</code> <code class="mi">3</code><code class="p">::</code><code class="mi">2</code><code class="p">]))</code>
+<code class="n">downsampled_valid</code> <code class="o">=</code> <code class="n">longer_valid</code><code class="o">.</code><code class="n">map</code><code class="p">(</code><code class="k">lambda</code> <code class="n">X</code><code class="p">,</code> <code class="n">Y</code><code class="p">:</code> <code class="p">(</code><code class="n">X</code><code class="p">,</code> <code class="n">Y</code><code class="p">[:,</code> <code class="mi">3</code><code class="p">::</code><code class="mi">2</code><code class="p">]))</code>
+<code class="p">[</code><code class="o">...</code><code class="p">]</code>  <code class="c1"># compile and fit the model using the downsampled datasets</code></pre>
+<p>If you train and evaluate this model, you will find that it outperforms the previous model (by a small margin). In fact, it is actually possible to use only 1D convolutional layers and drop the recurrent layers entirely!</p>
+</div>
+</section>
+<section data-pdf-bookmark="WaveNet" data-type="sect3"><div class="sect3" id="idm45983085070832">
+<h3 class="sigil_not_in_toc">WaveNet</h3>
+<p>In a <a href="https://homl.info/wavenet">2016 paper</a>,⁠<sup><a data-type="noteref" href="#idm45983085101264" id="idm45983085101264-marker">16</a></sup> Aaron van den Oord and other DeepMind researchers<a data-primary="convolutional neural networks (CNNs)" data-secondary="convolutional layers" data-type="indexterm" id="ix_cnns_conv_layer3"></a><a data-primary="convolutional neural networks (CNNs)" data-secondary="WaveNet" data-type="indexterm" id="ix_cnns_wavenet"></a><a data-primary="WaveNet" data-type="indexterm" id="ix_wave_net"></a> introduced a novel architecture called <em>WaveNet</em>. They stacked 1D convolutional layers, doubling the dilation rate (how spread apart each neuron’s inputs are) at every layer: the first convolutional layer gets a glimpse of just two time steps at a time, while the next one sees four time steps (its receptive field is four time steps long), the next one sees eight time steps, and so on (see <a data-type="xref" href="#wavenet_diagram">Figure 15-14</a>). This way, the lower layers learn short-term patterns, while the higher layers learn long-term patterns. Thanks to the doubling dilation rate, the network can process extremely large sequences very efficiently.</p>
+<figure><div class="figure" id="wavenet_diagram">
+<img alt="mls3 1514" height="243" src="../Images/mls3_1514.png" width="600"/>
+<h6 class="sigil_not_in_toc"><span class="label">Figure 15-14. </span>WaveNet architecture</h6>
+</div>
+</figure>
+<p>The authors of the paper actually stacked 10 convolutional layers with dilation rates of 1, 2, 4, 8, …, 256, 512, then they stacked another group of 10 identical layers (also with dilation rates 1, 2, 4, 8, …, 256, 512), then again another identical group of 10 layers. They justified this architecture by pointing out that a single stack of 10 convolutional layers with these dilation rates will act like a super-efficient convolutional layer with a kernel of size 1,024 (except way faster, more powerful, and using significantly fewer parameters). They also left-padded the input sequences with a number of zeros equal to the dilation rate before every layer, to preserve the same sequence length throughout the network.</p>
+<p>Here is how to implement a simplified WaveNet to tackle the same sequences as <span class="keep-together">earlier</span>:⁠<sup><a data-type="noteref" href="#idm45983085092400" id="idm45983085092400-marker">17</a></sup></p>
+<pre data-code-language="python" data-type="programlisting"><code class="n">wavenet_model</code> <code class="o">=</code> <code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">Sequential</code><code class="p">()</code>
+<code class="n">wavenet_model</code><code class="o">.</code><code class="n">add</code><code class="p">(</code><code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Input</code><code class="p">(</code><code class="n">shape</code><code class="o">=</code><code class="p">[</code><code class="kc">None</code><code class="p">,</code> <code class="mi">5</code><code class="p">]))</code>
+<code class="k">for</code> <code class="n">rate</code> <code class="ow">in</code> <code class="p">(</code><code class="mi">1</code><code class="p">,</code> <code class="mi">2</code><code class="p">,</code> <code class="mi">4</code><code class="p">,</code> <code class="mi">8</code><code class="p">)</code> <code class="o">*</code> <code class="mi">2</code><code class="p">:</code>
+    <code class="n">wavenet_model</code><code class="o">.</code><code class="n">add</code><code class="p">(</code><code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Conv1D</code><code class="p">(</code>
+        <code class="n">filters</code><code class="o">=</code><code class="mi">32</code><code class="p">,</code> <code class="n">kernel_size</code><code class="o">=</code><code class="mi">2</code><code class="p">,</code> <code class="n">padding</code><code class="o">=</code><code class="s2">"causal"</code><code class="p">,</code> <code class="n">activation</code><code class="o">=</code><code class="s2">"relu"</code><code class="p">,</code>
+        <code class="n">dilation_rate</code><code class="o">=</code><code class="n">rate</code><code class="p">))</code>
+<code class="n">wavenet_model</code><code class="o">.</code><code class="n">add</code><code class="p">(</code><code class="n">tf</code><code class="o">.</code><code class="n">keras</code><code class="o">.</code><code class="n">layers</code><code class="o">.</code><code class="n">Conv1D</code><code class="p">(</code><code class="n">filters</code><code class="o">=</code><code class="mi">14</code><code class="p">,</code> <code class="n">kernel_size</code><code class="o">=</code><code class="mi">1</code><code class="p">))</code></pre>
+<p>This <code>Sequential</code> model starts with an explicit input layer—this is simpler than trying to set <code>input_shape</code> only on the first layer. Then it continues with a 1D convolutional layer using <code>"causal"</code> padding, which is like <code>"same"</code> padding except that the zeros are appended only at the start of the input sequence, instead of on both sides. This ensures that the convolutional layer does not peek into the future when making predictions. Then we add <span class="keep-together">similar</span> pairs of layers using growing dilation rates: 1, 2, 4, 8, and again 1, 2, 4, 8. Finally, we add the output layer: a convolutional layer with 14 filters of size 1 and without any activation function. As we saw earlier, such a convolutional layer is equivalent to a <code>Dense</code> layer with 14 units. Thanks to the causal padding, every convolutional layer outputs a sequence of the same length as its input sequence, so the targets we use during training can be the full 112-day sequences: no need to crop them or downsample them.</p>
+<p>The models we’ve discussed in this section offer similar performance for the ridership forecasting task, but they may vary significantly depending on the task and the amount of available data. In the WaveNet paper, the authors achieved state-of-the-art performance on various audio tasks (hence the name of the architecture), including text-to-speech tasks, producing incredibly realistic voices across several languages. They also used the model to generate music, one audio sample at a time. This feat is all the more impressive when you realize that a single second of audio can contain tens of thousands of time steps—even LSTMs and GRUs cannot handle such long sequences.</p>
+<div data-type="warning" epub:type="warning"><h6 class="sigil_not_in_toc">Warning</h6>
+<p>If you evaluate our best Chicago ridership models on the test period, starting in 2020, you will find that they perform much worse than expected! Why is that? Well, that’s when the Covid-19 pandemic started, which greatly affected public transportation. As mentioned earlier, these models will only work well if the patterns they learned from the past continue in the future. In any case, before deploying a model to production, verify that it works well on recent data. And once it’s in production, make sure to monitor its performance regularly.<a data-primary="" data-startref="ix_rnn_long_seq" data-type="indexterm" id="idm45983084989680"></a><a data-primary="" data-startref="ix_long_seq_rnn" data-type="indexterm" id="idm45983084988704"></a><a data-primary="" data-startref="ix_rnn_mem_cell" data-type="indexterm" id="idm45983084987760"></a><a data-primary="" data-startref="ix_mem_cell_rnn" data-type="indexterm" id="idm45983084986816"></a><a data-primary="" data-startref="ix_wave_net" data-type="indexterm" id="idm45983084985872"></a><a data-primary="" data-startref="ix_cnns_wavenet" data-type="indexterm" id="idm45983084984928"></a><a data-primary="" data-startref="ix_long_seq_short_mem" data-type="indexterm" id="idm45983084983984"></a><a data-primary="" data-startref="ix_cnns_conv_layer3" data-type="indexterm" id="idm45983084914320"></a></p>
+</div>
+<p>With that, you can now tackle all sorts of time series! In <a data-type="xref" href="HOMLWSKT021.xhtml#nlp_chapter">Chapter 16</a>, we will continue to explore RNNs, and we will see how they can tackle various NLP tasks as well.</p>
+</div>
+</section>
+</div>
+</section>
+</div>
+</section>
+<section data-pdf-bookmark="Exercises" data-type="sect1"><div class="sect1" id="idm45983084911984">
+<h2 id="sigil_toc_id_307">Exercises</h2>
+<ol>
+<li>
+<p>Can you think of a few applications for a sequence-to-sequence RNN? What about a sequence-to-vector RNN, and a vector-to-sequence RNN?</p>
+</li>
+<li>
+<p>How many dimensions must the inputs of an RNN layer have? What does each dimension represent? What about its outputs?</p>
+</li>
+<li>
+<p>If you want to build a deep sequence-to-sequence RNN, which RNN layers should have <code>return_sequences=True</code>? What about a sequence-to-vector RNN?</p>
+</li>
+<li>
+<p>Suppose you have a daily univariate time series, and you want to forecast the next seven days. Which RNN architecture should you use?</p>
+</li>
+<li>
+<p>What are the main difficulties when training RNNs? How can you handle them?</p>
+</li>
+<li>
+<p>Can you sketch the LSTM cell’s architecture?</p>
+</li>
+<li>
+<p>Why would you want to use 1D convolutional layers in an RNN?</p>
+</li>
+<li>
+<p>Which neural network architecture could you use to classify videos?</p>
+</li>
+<li>
+<p>Train a classification model for the SketchRNN dataset, available in TensorFlow Datasets.</p>
+</li>
+<li>
+<p>Download the <a href="https://homl.info/bach">Bach chorales</a> dataset and unzip it. It is composed of 382 chorales composed by Johann Sebastian Bach. Each chorale is 100 to 640 time steps long, and each time step contains 4 integers, where each integer corresponds to a note’s index on a piano (except for the value 0, which means that no note is played). Train a model—recurrent, convolutional, or both—that can predict the next time step (four notes), given a sequence of time steps from a chorale. Then use this model to generate Bach-like music, one note at a time: you can do this by giving the model the start of a chorale and asking it to predict the next time step, then appending these time steps to the input sequence and asking the model for the next note, and so on. Also make sure to check out <a href="https://homl.info/coconet">Google’s Coconet model</a>, which was used for a nice Google doodle about Bach.</p>
+</li>
+</ol>
+<p>Solutions to these exercises are available at the end of this chapter’s notebook, at <a href="https://homl.info/colab3"><em class="hyperlink">https://homl.info/colab3</em></a>.</p>
+</div>
+</section>
+<div data-type="footnotes"><p data-type="footnote" id="idm45983089419952"><sup><a href="#idm45983089419952-marker">1</a></sup> Note that many researchers prefer to use the hyperbolic tangent (tanh) activation function in RNNs rather than the ReLU activation function. For example, see Vu Pham et al.’s <a href="https://homl.info/91">2013 paper</a> “Dropout Improves Recurrent Neural Networks for Handwriting Recognition”. ReLU-based RNNs are also possible, as shown in Quoc V. Le et al.’s <a href="https://homl.info/92">2015 paper</a> “A Simple Way to Initialize Recurrent Networks of Rectified Linear Units”.</p>
+<p data-type="footnote" id="idm45983089280464"><sup><a href="#idm45983089280464-marker">2</a></sup> Nal Kalchbrenner and Phil Blunsom, “Recurrent Continuous Translation Models”, <em>Proceedings of the 2013 Conference on Empirical Methods in Natural Language Processing</em> (2013): 1700–1709.</p>
+<p data-type="footnote" id="idm45983089245360"><sup><a href="#idm45983089245360-marker">3</a></sup> The latest data from the Chicago Transit Authority is available at the <a href="https://homl.info/ridership">Chicago Data Portal</a>.</p>
+<p data-type="footnote" id="idm45983088137200"><sup><a href="#idm45983088137200-marker">4</a></sup> There are other more principled approaches to <a data-primary="ACF (autocorrelation function)" data-type="indexterm" id="idm45983088136432"></a><a data-primary="autocorrelation function (ACF)" data-type="indexterm" id="idm45983088135792"></a><a data-primary="PACF (partial autocorrelation function)" data-type="indexterm" id="idm45983088135152"></a><a data-primary="partial autocorrelation function (PACF)" data-type="indexterm" id="idm45983088134512"></a>selecting good hyperparameters, based on analyzing the <em>autocorrelation function</em> (ACF) and <em>partial autocorrelation function</em> (PACF), or minimizing the AIC or BIC metrics (introduced in <a data-type="xref" href="HOMLWSKT013.xhtml#unsupervised_learning_chapter">Chapter 9</a>) to penalize models that use too many parameters and reduce the risk of overfitting the data, but grid search is a good place to start. For more details on the ACF-PACF approach, check out this very nice <a href="https://homl.info/arimatuning">post by Jason Brownlee</a>.</p>
+<p data-type="footnote" id="idm45983087404768"><sup><a href="#idm45983087404768-marker">5</a></sup> Note that the validation period starts on the 1st of January 2019, so the first prediction is for the 26th of February 2019, eight weeks later. When we evaluated the baseline models we used predictions starting on the 1st of March instead, but this should be close enough.</p>
+<p data-type="footnote" id="idm45983086723984"><sup><a href="#idm45983086723984-marker">6</a></sup> Feel free to play around with this model. For example, you can try forecasting both the bus and rail ridership for the next 14 days. You’ll need to tweak the targets to include both, and make your model output 28 forecasts instead of 14.</p>
+<p data-type="footnote" id="idm45983085938976"><sup><a href="#idm45983085938976-marker">7</a></sup> César Laurent et al., “Batch Normalized Recurrent Neural Networks”, <em>Proceedings of the IEEE International Conference on Acoustics, Speech, and Signal Processing</em> (2016): 2657–2661.</p>
+<p data-type="footnote" id="idm45983085931520"><sup><a href="#idm45983085931520-marker">8</a></sup> Jimmy Lei Ba et al., “Layer Normalization”, arXiv preprint arXiv:1607.06450 (2016).</p>
+<p data-type="footnote" id="idm45983085849968"><sup><a href="#idm45983085849968-marker">9</a></sup> It would have been simpler to inherit from <code>SimpleRNNCell</code> instead so that we wouldn’t have to create an internal <code>SimpleRNNCell</code> or handle the <code>state_size</code> and <code>output_size</code> attributes, but the goal here was to show how to create a custom cell from scratch.</p>
+<p data-type="footnote" id="idm45983085649872"><sup><a href="#idm45983085649872-marker">10</a></sup> A character from the animated movies <em>Finding Nemo</em> and <em>Finding Dory</em> who has short-term memory loss.</p>
+<p data-type="footnote" id="idm45983085645024"><sup><a href="#idm45983085645024-marker">11</a></sup> Sepp Hochreiter and Jürgen Schmidhuber, “Long Short-Term Memory”, <em>Neural Computation</em> 9, no. 8 (1997): 1735–1780.</p>
+<p data-type="footnote" id="idm45983085642320"><sup><a href="#idm45983085642320-marker">12</a></sup> Haşim Sak et al., “Long Short-Term Memory Based Recurrent Neural Network Architectures for Large Vocabulary Speech Recognition”, arXiv preprint arXiv:1402.1128 (2014).</p>
+<p data-type="footnote" id="idm45983085640720"><sup><a href="#idm45983085640720-marker">13</a></sup> Wojciech Zaremba et al., “Recurrent Neural Network Regularization”, arXiv preprint arXiv:1409.2329 (2014).</p>
+<p data-type="footnote" id="idm45983085384208"><sup><a href="#idm45983085384208-marker">14</a></sup> Kyunghyun Cho et al., “Learning Phrase Representations Using RNN Encoder–Decoder for Statistical Machine Translation”, <em>Proceedings of the 2014 Conference on Empirical Methods in Natural Language Processing</em> (2014): 1724–1734.</p>
+<p data-type="footnote" id="idm45983085378608"><sup><a href="#idm45983085378608-marker">15</a></sup> See Klaus Greff et al., <a href="https://homl.info/98">“LSTM: A Search Space Odyssey”</a>, <em>IEEE Transactions on Neural Networks and Learning Systems</em> 28, no. 10 (2017): 2222–2232.This paper seems to show that all LSTM variants perform roughly the same.</p>
+<p data-type="footnote" id="idm45983085101264"><sup><a href="#idm45983085101264-marker">16</a></sup> Aaron van den Oord et al., “WaveNet: A Generative Model for Raw Audio”, arXiv preprint arXiv:1609.03499 (2016).</p>
+<p data-type="footnote" id="idm45983085092400"><sup><a href="#idm45983085092400-marker">17</a></sup> The complete WaveNet uses a few more tricks, such as skip connections <a data-primary="gated activation units" data-type="indexterm" id="idm45983085091808"></a>like in a ResNet, and <em>gated activation units</em> similar to those found in a GRU cell. See this chapter’s notebook for more details.</p>
+</div>
+</div>
+</section>
+</div>
+</body>
+</html>
